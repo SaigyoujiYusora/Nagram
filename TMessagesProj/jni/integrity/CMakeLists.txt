@@ -1,10 +1,13 @@
-add_library(integrity STATIC
-        integrity/integrity.cpp
-        integrity/meth.cpp
+add_library(genuine STATIC
+        integrity/am-proxy.c
+        integrity/apk-sign-v2.c
+        integrity/common.c
+        integrity/genuine.c
+        integrity/inline.c
         integrity/openat.c
-        integrity/read_cert.cpp
-        integrity/SHA1.cpp)
-target_compile_options(integrity PUBLIC
+        integrity/path.c
+        integrity/plt.c)
+target_compile_options(genuine PUBLIC
         -Oz -Wall -fvisibility=hidden)
-target_include_directories(integrity PUBLIC
+target_include_directories(genuine PUBLIC
         integrity)

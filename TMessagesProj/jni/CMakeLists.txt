@@ -669,7 +669,7 @@ target_link_libraries(${NATIVE_LIB}
         android
         OpenSLES
         cpufeatures
-        integrity
+        genuine
         breakpad)
 
 
