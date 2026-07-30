@@ -32,6 +32,7 @@ import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.wallpaper.WallpaperGiftPatternPosition;
 import org.telegram.tgnet.TLRPC;
@@ -43,6 +44,7 @@ import java.util.Random;
 public class MotionBackgroundDrawable extends Drawable {
 
     private final static int ANIMATION_CACHE_BITMAPS_COUNT = 3;
+    private final static boolean FAST_RENDER_ALLOWED = true;
 
     private static final boolean useLegacyBitmap = Build.VERSION.SDK_INT < 28;
     private static final boolean useSoftLight = Build.VERSION.SDK_INT >= 29;
@@ -114,7 +116,7 @@ public class MotionBackgroundDrawable extends Drawable {
     private boolean rotatingPreview;
 
     private Runnable updateAnimationRunnable = () -> {
-        updateAnimation(true);
+        updateAnimation();
     };
 
     private android.graphics.Rect patternBounds = new android.graphics.Rect();
@@ -133,6 +135,8 @@ public class MotionBackgroundDrawable extends Drawable {
     private Paint overrideBitmapPaint;
     private int bitmapWidth = 60;
     private int bitmapHeight = 80;
+
+    private MotionBackgroundPaint motionBackgroundPaint;
 
     public MotionBackgroundDrawable() {
         super();
@@ -161,12 +165,15 @@ public class MotionBackgroundDrawable extends Drawable {
     @SuppressLint("NewApi")
     private void init() {
         currentBitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
+        currentBitmap.setHasAlpha(false);
         for (int i = 0; i < ANIMATION_CACHE_BITMAPS_COUNT; i++) {
             gradientToBitmap[i] = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
+            gradientToBitmap[i].setHasAlpha(false);
         }
         gradientCanvas = new Canvas(currentBitmap);
 
         gradientFromBitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
+        gradientFromBitmap.setHasAlpha(false);
         gradientFromCanvas = new Canvas(gradientFromBitmap);
 
         Utilities.generateGradient(currentBitmap, true, phase, interpolator.getInterpolation(posAnimationProgress), currentBitmap.getWidth(), currentBitmap.getHeight(), currentBitmap.getRowBytes(), colors);
@@ -175,6 +182,12 @@ public class MotionBackgroundDrawable extends Drawable {
         }
 
         legacyPaintNegativeIntensityGradient.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+    }
+
+    public void setFastRenderAllowed() {
+        if (FAST_RENDER_ALLOWED && motionBackgroundPaint == null && !SharedConfig.fastWallpaperDisabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            motionBackgroundPaint = new MotionBackgroundPaint();
+        }
     }
 
     public void setRoundRadius(int rad) {
@@ -277,7 +290,7 @@ public class MotionBackgroundDrawable extends Drawable {
 
     public void setPosAnimationProgress(float posAnimationProgress) {
         this.posAnimationProgress = posAnimationProgress;
-        updateAnimation(true);
+        updateAnimation();
     }
 
     public void switchToNextPosition() {
@@ -286,6 +299,7 @@ public class MotionBackgroundDrawable extends Drawable {
 
     public void switchToNextPosition(boolean fast) {
         if (posAnimationProgress < 1.0f || !LiteMode.isEnabled(LiteMode.FLAG_CHAT_BACKGROUND)) {
+            invalidateParent();
             return;
         }
         rotatingPreview = false;
@@ -397,7 +411,7 @@ public class MotionBackgroundDrawable extends Drawable {
         }
         if (postInvalidateParent) {
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.invalidateMotionBackground);
-            updateAnimation(false);
+            updateAnimation();
             AndroidUtilities.cancelRunOnUIThread(updateAnimationRunnable);
             AndroidUtilities.runOnUIThread(updateAnimationRunnable, 16);
         }
@@ -551,7 +565,9 @@ public class MotionBackgroundDrawable extends Drawable {
         }
     }
 
+    private int patternColor = Color.BLACK;
     public void setPatternColorFilter(int color) {
+        patternColor = color;
         patternColorFilter = new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN);
         invalidateParent();
     }
@@ -658,7 +674,7 @@ public class MotionBackgroundDrawable extends Drawable {
         }
         canvas.restore();
 
-        updateAnimation(true);
+        updateAnimation();
     }
     public void drawPattern(Canvas canvas) {
         android.graphics.Rect bounds = getBounds();
@@ -795,13 +811,13 @@ public class MotionBackgroundDrawable extends Drawable {
                 paint2.setColorFilter(patternColorFilter);
                 paint2.setAlpha((int) ((Math.abs(intensity) / 100f) * alpha * patternAlpha));
                 canvas.drawBitmap(patternBitmap, null, rect, paint2);
-                paint.setAlpha((int) ((Math.abs(intensity) / 100f) * alpha * patternAlpha * 0.8f));
+                paint2.setAlpha((int) ((Math.abs(intensity) / 100f) * alpha * patternAlpha * 0.8f));
                 drawGiftPatternsForPositiveIntensity(canvas, rect, paint2, giftPosition);
             }
         }
         canvas.restore();
 
-        updateAnimation(true);
+        updateAnimation();
     }
 
     @Override
@@ -823,8 +839,17 @@ public class MotionBackgroundDrawable extends Drawable {
             y += bounds.top;
             canvas.clipRect(bounds.left, bounds.top, bounds.right, bounds.bottom);
         }
+
+        final boolean isUseFastRender = FAST_RENDER_ALLOWED
+            && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+            && motionBackgroundPaint != null
+            && currentBitmap != null
+            && patternBitmap != null;
+
         if (intensity < 0) {
-            canvas.drawColor(ColorUtils.setAlphaComponent(Color.BLACK, (int) (alpha * backgroundAlpha)));
+            if (!isUseFastRender) {
+                canvas.drawColor(ColorUtils.setAlphaComponent(Color.BLACK, (int) (alpha * backgroundAlpha)));
+            }
             if (patternBitmap != null) {
                 if (useLegacyBitmap) {
                     if (errorWhileGenerateLegacyBitmap) {
@@ -923,7 +948,17 @@ public class MotionBackgroundDrawable extends Drawable {
                     paint2.setColorFilter(null);
                     paint2.setAlpha((int) ((Math.abs(intensity) / 100f) * alpha * patternAlpha));
                     rect.set(bounds.left, bounds.top, bounds.right, bounds.bottom);
-                    canvas.drawRoundRect(rect, roundRadius, roundRadius, paint2);
+
+                    if (isUseFastRender) {
+                        final Paint paint = motionBackgroundPaint.getPaint(currentBitmap, patternBitmap,
+                            patternColor, (int) (alpha * patternAlpha), intensity, canvas.isHardwareAccelerated());
+                        motionBackgroundPaint.applyPatternMatrix(matrix);
+                        motionBackgroundPaint.applyGradientMatrix(rect);
+
+                        canvas.drawRoundRect(rect, roundRadius, roundRadius, paint);
+                    } else {
+                        canvas.drawRoundRect(rect, roundRadius, roundRadius, paint2);
+                    }
                     drawGiftPatternsForNegativeIntensity(canvas, x, y + tr, maxScale);
                 }
             }
@@ -938,7 +973,9 @@ public class MotionBackgroundDrawable extends Drawable {
                 bitmapShader.setLocalMatrix(matrix);
 
                 rect.set(bounds.left, bounds.top, bounds.right, bounds.bottom);
-                canvas.drawRoundRect(rect, roundRadius, roundRadius, paint);
+                if (!isUseFastRender) {
+                    canvas.drawRoundRect(rect, roundRadius, roundRadius, paint);
+                }
             } else {
                 canvas.translate(0, tr);
                 if (gradientDrawable != null) {
@@ -950,7 +987,9 @@ public class MotionBackgroundDrawable extends Drawable {
                     Paint bitmapPaint = overrideBitmapPaint != null ? overrideBitmapPaint : paint;
                     int wasAlpha = bitmapPaint.getAlpha();
                     bitmapPaint.setAlpha((int) (wasAlpha * backgroundAlpha));
-                    canvas.drawBitmap(currentBitmap, null, rect, bitmapPaint);
+                    if (!isUseFastRender) {
+                        canvas.drawBitmap(currentBitmap, null, rect, bitmapPaint);
+                    }
                     bitmapPaint.setAlpha(wasAlpha);
                 }
             }
@@ -967,22 +1006,32 @@ public class MotionBackgroundDrawable extends Drawable {
 
                 paint2.setColorFilter(patternColorFilter);
                 paint2.setAlpha((int) ((Math.abs(intensity) / 100f) * alpha * patternAlpha));
-                canvas.drawBitmap(patternBitmap, null, rect, paint2);
-                paint.setAlpha((int) ((Math.abs(intensity) / 100f) * alpha * patternAlpha * 0.8f));
+                if (isUseFastRender) {
+                    final Paint paint = motionBackgroundPaint.getPaint(currentBitmap, patternBitmap,
+                        patternColor, (int) (alpha * patternAlpha), intensity, canvas.isHardwareAccelerated());
+
+                    motionBackgroundPaint.applyPatternMatrix(rect);
+                    motionBackgroundPaint.applyGradientMatrix(rect);
+
+                    canvas.drawRect(rect, paint);
+                } else {
+                    canvas.drawBitmap(patternBitmap, null, rect, paint2);
+                }
+                paint2.setAlpha((int) ((Math.abs(intensity) / 100f) * alpha * patternAlpha * 0.8f));
                 drawGiftPatternsForPositiveIntensity(canvas, rect, paint2, giftPosition);
             }
         }
         canvas.restore();
 
-        updateAnimation(true);
+        updateAnimation();
     }
 
     public void setAnimationProgressProvider(GenericProvider<MotionBackgroundDrawable, Float> animationProgressProvider) {
         this.animationProgressProvider = animationProgressProvider;
-        updateAnimation(true);
+        updateAnimation();
     }
 
-    public void updateAnimation(boolean invalidate) {
+    public void updateAnimation() {
         long newTime = SystemClock.elapsedRealtime();
         long dt = newTime - lastUpdateTime;
         if (dt > 20) {
@@ -1125,9 +1174,7 @@ public class MotionBackgroundDrawable extends Drawable {
                     }
                 }
             }
-            if (invalidate) {
-                invalidateParent();
-            }
+            invalidateParent();
         }
     }
 

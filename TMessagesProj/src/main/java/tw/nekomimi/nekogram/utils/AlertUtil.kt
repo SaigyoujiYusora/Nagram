@@ -246,8 +246,12 @@ object AlertUtil {
                     LocaleController.getString(R.string.ProviderLingocloud),
                     LocaleController.getString(R.string.ProviderMicrosoftTranslator),
                     LocaleController.getString(R.string.ProviderYouDao),
+                    LocaleController.getString(R.string.ProviderDeepLxTranslate),
+                    LocaleController.getString(R.string.ProviderTelegramAPI),
+                    LocaleController.getString(R.string.ProviderTranSmartTranslate),
+                    LocaleController.getString(R.string.ProviderLLMTranslate),
                     LocaleController.getString(R.string.ProviderDeepLTranslate),
-                    LocaleController.getString(R.string.ProviderTelegramAPI)
+                    LocaleController.getString(R.string.ProviderDeepLFreeTranslate)
                 ).toList()
             )
 

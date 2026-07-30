@@ -36,6 +36,12 @@ object NaConfig {
             ConfigItem.configTypeBool,
             false
         )
+    val disableSecondAddress =
+        addConfig(
+            "disableSecondAddress",
+            ConfigItem.configTypeBool,
+            true
+        )
     val showInvertReply =
         addConfig(
             "InvertReply",
@@ -445,6 +451,13 @@ object NaConfig {
             0,
             false
         )
+    val defaultDeleteMenuDeleteAllReactions =
+        addConfig(
+            "DeleteAllReactionsFromUsers",
+            defaultDeleteMenu,
+            4,
+            false
+        )
     val disableSuggestionView =
         addConfig(
             "DisableSuggestionView",
@@ -532,6 +545,18 @@ object NaConfig {
             ConfigItem.configTypeBool,
             false
         )
+    val newMarkdownParser =
+        addConfig(
+            "NewMarkdownParser",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val markdownParseLinks =
+        addConfig(
+            "MarkdownParseLinks",
+            ConfigItem.configTypeBool,
+            true
+        )
     val disableClickProfileGalleryView =
         addConfig(
             "DisableClickProfileGalleryView",
@@ -590,7 +615,31 @@ object NaConfig {
         addConfig(
             "PushServiceTypeUnifiedGateway",
             ConfigItem.configTypeString,
-            "https://p2p.xtaolabs.com/"
+            "https://p2p.hoyolab.pp.ua/"
+        )
+    val pushServiceTypeUnifiedSimple =
+        addConfig(
+            "PushServiceTypeUnifiedSimple",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val pushServiceTypeUnifiedWebPushPrivateKey =
+        addConfig(
+            "PushServiceTypeUnifiedWebPushPrivateKey",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val pushServiceTypeUnifiedWebPushPublicKey =
+        addConfig(
+            "PushServiceTypeUnifiedWebPushPublicKey",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val pushServiceTypeUnifiedWebPushAuthSecret =
+        addConfig(
+            "PushServiceTypeUnifiedWebPushAuthSecret",
+            ConfigItem.configTypeString,
+            ""
         )
     val sendMp4DocumentAsVideo =
         addConfig(
@@ -902,12 +951,6 @@ object NaConfig {
             ConfigItem.configTypeBool,
             false
         )
-    val showRecentChatsInSidebar =
-        addConfig(
-            "ShowRecentChatsInSidebar",
-            ConfigItem.configTypeBool,
-            true
-        )
     val removeFavouriteStickersInRecentStickers =
         addConfig(
             "RemoveFavouriteStickersInRecentStickers",
@@ -931,6 +974,313 @@ object NaConfig {
             "UseSystemAiService",
             ConfigItem.configTypeBool,
             true
+        )
+    val navigationAnimationSpring =
+        addConfig(
+            "NavigationAnimationSpring",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val forceEdgeToEdge =
+        addConfig(
+            "ForceEdgeToEdge",
+            ConfigItem.configTypeBool,
+            false
+        )
+    var tabStyle =
+        addConfig(
+            "TabStyle",
+            ConfigItem.configTypeInt,
+            0
+        )
+    val chatActivityNavbarTransparent =
+        addConfig(
+            "ChatActivityNavbarTransparent",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val fixUrlPagePreview =
+        addConfig(
+            "FixUrlPagePreview",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val fixUrlAutoInlineBot =
+        addConfig(
+            "FixUrlAutoInlineBot",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val localInlineBotRulesData =
+        addConfig(
+            "LocalInlineBotRulesData",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val localInlineBotRulesEnabled =
+        addConfig(
+            "LocalInlineBotRulesEnabled",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val disabledRemoteInlineBotRules =
+        addConfig(
+            "DisabledRemoteInlineBotRules",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val fixUrlAutoInlineBotSkipMediaPreview =
+        addConfig(
+            "FixUrlAutoInlineBotSkipMediaPreview",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val deepLxCustomApi =
+        addConfig(
+            "DeepLxCustomApi",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val deepLFormality =
+        addConfig(
+            "DeepLFormality",
+            ConfigItem.configTypeInt,
+            0 // 0: default, 1: more formal, 2: less formal
+        )
+    val deepLApiKey =
+        addConfig(
+            "DeepLApiKey",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val deepLFreeApiKey =
+        addConfig(
+            "DeepLFreeApiKey",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val summarizeTextButton =
+        addConfig(
+            "SummarizeTextButton",
+            ConfigItem.configTypeInt,
+            0
+        )
+    val disablePredictiveBackAnimation =
+        addConfig(
+            "DisablePredictiveBackAnimation",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val llmProvider =
+        addConfig(
+            "LLMProvider",
+            ConfigItem.configTypeInt,
+            0
+        )
+    val llmApiFormat =
+        addConfig(
+            "LLMApiFormat",
+            ConfigItem.configTypeInt,
+            0
+        )
+    val llmApiKeys =
+        addConfig(
+            "LLMApiKeys",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val llmApiUrl =
+        addConfig(
+            "LLMApiUrl",
+            ConfigItem.configTypeString,
+            "https://api.openai.com/v1/chat/completions"
+        )
+    val llmOpenAIModel =
+        addConfig(
+            "LLMOpenAIModel",
+            ConfigItem.configTypeString,
+            "gpt-4.1-mini"
+        )
+    val llmGeminiModel =
+        addConfig(
+            "LLMGeminiModel",
+            ConfigItem.configTypeString,
+            "gemini-2.5-flash"
+        )
+    val llmGroqModel =
+        addConfig(
+            "LLMGroqModel",
+            ConfigItem.configTypeString,
+            "llama-3.3-70b-versatile"
+        )
+    val llmDeepSeekModel =
+        addConfig(
+            "LLMDeepSeekModel",
+            ConfigItem.configTypeString,
+            "deepseek-chat"
+        )
+    val llmXAIModel =
+        addConfig(
+            "LLMXAIModel",
+            ConfigItem.configTypeString,
+            "grok-3-mini-fast"
+        )
+    val llmZhipuAIModel =
+        addConfig(
+            "LLMZhipuAIModel",
+            ConfigItem.configTypeString,
+            "GLM-4-Flash"
+        )
+    val llmMistralModel =
+        addConfig(
+            "LLMMistralModel",
+            ConfigItem.configTypeString,
+            "mistral-small-latest"
+        )
+    val llmOpenRouterModel =
+        addConfig(
+            "LLMOpenRouterModel",
+            ConfigItem.configTypeString,
+            "meta-llama/llama-3.3-70b-instruct"
+        )
+    val llmQwenModel =
+        addConfig(
+            "LLMQwenModel",
+            ConfigItem.configTypeString,
+            "qwen-turbo-latest"
+        )
+    val llmMoonshotModel =
+        addConfig(
+            "LLMMoonshotModel",
+            ConfigItem.configTypeString,
+            "moonshot-v1-8k"
+        )
+    val llmSiliconFlowModel =
+        addConfig(
+            "LLMSiliconFlowModel",
+            ConfigItem.configTypeString,
+            "Qwen/Qwen2.5-7B-Instruct"
+        )
+    val llmCustomModel =
+        addConfig(
+            "LLMCustomModel",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val llmSystemPrompt =
+        addConfig(
+            "LLMSystemPrompt",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val llmTemperature =
+        addConfig(
+            "LLMTemperature",
+            ConfigItem.configTypeString,
+            "0.7"
+        )
+    val mainTabsStyle =
+        addConfig(
+            "MainTabsStyle",
+            ConfigItem.configTypeInt,
+            0
+        )
+    val showRecentChatsOnTabLongPress =
+        addConfig(
+            "ShowRecentChatsOnTabLongPress",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val customIpStrategy =
+        addConfig(
+            "CustomIpStrategy",
+            ConfigItem.configTypeInt,
+            0
+        )
+    val customDialogsMenu =
+        addConfig(
+            "CustomDialogsMenu",
+            ConfigItem.configTypeInt,
+            0
+        )
+    val customDialogsMenuTheme =
+        addConfig(
+            "SwitchThemeToDay",
+            customDialogsMenu,
+            0,
+            true
+        )
+    val showRecentChatsInSidebar =
+        addConfig(
+            "ShowRecentChatsInSidebar",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val customDialogsMenuNewGroup =
+        addConfig(
+            "NewGroup",
+            customDialogsMenu,
+            1,
+            true
+        )
+    val customDialogsMenuNewMessage =
+        addConfig(
+            "NewMessageTitle",
+            customDialogsMenu,
+            2,
+            false
+        )
+    val customDialogsMenuSavedMessages =
+        addConfig(
+            "SavedMessages",
+            customDialogsMenu,
+            3,
+            true
+        )
+    val customDialogsMenuSettings =
+        addConfig(
+            "Settings",
+            customDialogsMenu,
+            4,
+            true
+        )
+    val customDialogsMenuProxy =
+        addConfig(
+            "MenuProxyTitle",
+            customDialogsMenu,
+            5,
+            true
+        )
+    val customDialogsMenuAccount =
+        addConfig(
+            "AddAccount",
+            customDialogsMenu,
+            6,
+            false
+        )
+    val sidebarSettingsActivity =
+        addConfig(
+            "SidebarSettingsActivity",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val compactMessageMenuOptions =
+        addConfig(
+            "CompactMessageMenuOptions",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val hiddenMessageMenuOptions =
+        addConfig(
+            "HiddenMessageMenuOptions",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val showRecentForwardTab =
+        addConfig(
+            "ShowRecentForwardTab",
+            ConfigItem.configTypeBool,
+            false
         )
 
     private fun addConfig(

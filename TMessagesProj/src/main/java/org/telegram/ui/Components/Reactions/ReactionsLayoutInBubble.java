@@ -49,6 +49,7 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ChatMessageCell;
+import org.telegram.ui.Cells.IMessageCell;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AnimatedEmojiSpan;
 import org.telegram.ui.Components.AnimatedFileDrawable;
@@ -58,6 +59,7 @@ import org.telegram.ui.Components.ButtonBounce;
 import org.telegram.ui.Components.CounterView;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.RLottieDrawable;
+import org.telegram.ui.Components.RLottieImageView;
 import org.telegram.ui.Stars.StarsReactionsSheet;
 
 import java.util.ArrayList;
@@ -486,12 +488,14 @@ public class ReactionsLayoutInBubble {
     }
 
     public boolean hasOverlay() {
-        return hasPaidReaction && !(isEmpty && outButtons.isEmpty()) && LiteMode.isEnabled(LiteMode.FLAG_ANIMATED_EMOJI_REACTIONS);
+        return hasPaidReaction && !(isEmpty && outButtons.isEmpty())
+            && LiteMode.isEnabled(LiteMode.FLAG_ANIMATED_EMOJI_REACTIONS)
+            && LiteMode.isEnabled(LiteMode.FLAG_PARTICLES);
     }
 
-    public void drawOverlay(Canvas canvas, float animationProgress) {
+    public boolean drawOverlay(Canvas canvas, float animationProgress) {
         if (isEmpty && outButtons.isEmpty()) {
-            return;
+            return false;
         }
         float totalX = this.x;
         float totalY = this.y;
@@ -502,6 +506,7 @@ public class ReactionsLayoutInBubble {
             totalX = totalX * (animationProgress) + fromX * (1f - animationProgress);
             totalY = totalY * (animationProgress) + fromY * (1f - animationProgress);
         }
+        boolean needsInvalidate = false;
         for (int i = 0; i < reactionButtons.size(); i++) {
             ReactionButton reactionButton = reactionButtons.get(i);
             if (!reactionButton.paid) continue;
@@ -518,7 +523,7 @@ public class ReactionsLayoutInBubble {
                 alpha = animationProgress;
                 canvas.scale(s, s, totalX + x + reactionButton.width / 2f, totalY + y + reactionButton.height / 2f);
             }
-            reactionButton.drawOverlay(canvas, totalX + x, totalY + y, reactionButton.animationType == ANIMATION_TYPE_MOVE ? animationProgress : 1f, alpha, false);
+            needsInvalidate = needsInvalidate || reactionButton.drawOverlay(canvas, totalX + x, totalY + y, reactionButton.animationType == ANIMATION_TYPE_MOVE ? animationProgress : 1f, alpha, false);
             canvas.restore();
         }
         for (int i = 0; i < outButtons.size(); i++) {
@@ -527,9 +532,10 @@ public class ReactionsLayoutInBubble {
             float s = 0.5f + 0.5f * (1f - animationProgress);
             canvas.save();
             canvas.scale(s, s, totalX + reactionButton.x + reactionButton.width / 2f, totalY + reactionButton.y + reactionButton.height / 2f);
-            outButtons.get(i).drawOverlay(canvas, totalX + reactionButton.x, totalY + reactionButton.y, 1f, (1f - animationProgress), false);
+            needsInvalidate = needsInvalidate || outButtons.get(i).drawOverlay(canvas, totalX + reactionButton.x, totalY + reactionButton.y, 1f, (1f - animationProgress), false);
             canvas.restore();
         }
+        return needsInvalidate;
     }
 
     public void drawPreview(View view, Canvas canvas, int offset, Integer drawOnlyReaction) {
@@ -571,16 +577,8 @@ public class ReactionsLayoutInBubble {
     }
 
     private void didPressReaction(TLRPC.ReactionCount reaction, boolean longpress, float x, float y) {
-        if (parentView instanceof ChatMessageCell) {
-            final ChatMessageCell cell = (ChatMessageCell) parentView;
-            final ChatMessageCell.ChatMessageCellDelegate delegate = cell.getDelegate();
-            if (delegate == null) return;
-            delegate.didPressReaction(cell, reaction, longpress, x, y);
-        } else if (parentView instanceof ChatActionCell) {
-            final ChatActionCell cell = (ChatActionCell) parentView;
-            final ChatActionCell.ChatActionCellDelegate delegate = cell.getDelegate();
-            if (delegate == null) return;
-            delegate.didPressReaction(cell, reaction, longpress, x, y);
+        if (parentView instanceof IMessageCell) {
+            ((IMessageCell) parentView).didPressReactionFromLayout(reaction, longpress, x, y);
         }
     }
 
@@ -804,6 +802,7 @@ public class ReactionsLayoutInBubble {
         public boolean wasDrawn;
         public String key;
         public boolean choosen;
+        public boolean drawBgOnlyIfChosen;
 
         public String countText;
         public TLRPC.Reaction reaction;
@@ -848,6 +847,8 @@ public class ReactionsLayoutInBubble {
         public final ButtonBounce bounce;
         private StarsReactionsSheet.Particles particles;
 
+        private RLottieDrawable starDrawable;
+
         protected int getCacheType() {
             if (isTag) {
                 return AnimatedEmojiDrawable.CACHE_TYPE_SAVED_REACTION;
@@ -872,6 +873,7 @@ public class ReactionsLayoutInBubble {
             }
             if (textDrawable == null) {
                 textDrawable = new AnimatedTextView.AnimatedTextDrawable(true, true, true);
+                textDrawable.ignoreRTL = true;
                 textDrawable.setAnimationProperties(.4f, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT);
                 textDrawable.setTextSize(dp(13));
                 textDrawable.setCallback(supercallback);
@@ -912,8 +914,12 @@ public class ReactionsLayoutInBubble {
                 if (visibleReaction.isStar) {
                     paid = true;
                     if (LiteMode.isEnabled(LiteMode.FLAG_ANIMATED_EMOJI_REACTIONS)) {
-                        RLottieDrawable drawable = new RLottieDrawable(R.raw.star_reaction_click, "star_reaction_click", dp(40), dp(40));
-                        imageReceiver.setImageBitmap(drawable);
+                        if (reuseFrom != null && reuseFrom.starDrawable != null) {
+                            starDrawable = reuseFrom.starDrawable;
+                        } else {
+                            starDrawable = new RLottieDrawable(R.raw.star_reaction_click, "star_reaction_click", dp(40), dp(40));
+                        }
+                        imageReceiver.setImageBitmap(starDrawable);
                     } else {
                         imageReceiver.setImageBitmap(ApplicationLoader.applicationContext.getResources().getDrawable(R.drawable.star_reaction).mutate());
                     }
@@ -922,7 +928,7 @@ public class ReactionsLayoutInBubble {
 //                    } else {
 //                        imageReceiver.setImageBitmap(ApplicationLoader.applicationContext.getResources().getDrawable(R.drawable.star_small_inner));
 //                    }
-                    particles = reuseFrom != null && reuseFrom.particles != null ? reuseFrom.particles : new StarsReactionsSheet.Particles(StarsReactionsSheet.Particles.TYPE_RADIAL, SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_HIGH ? 25 : 8);
+                    particles = reuseFrom != null && reuseFrom.particles != null ? reuseFrom.particles : new StarsReactionsSheet.Particles(StarsReactionsSheet.Particles.TYPE_RADIAL, SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_HIGH ? 18 : 8);
                 } else if (visibleReaction.emojicon != null) {
                     TLRPC.TL_availableReaction r = MediaDataController.getInstance(currentAccount).getReactionsMap().get(visibleReaction.emojicon);
                     if (r != null) {
@@ -987,29 +993,30 @@ public class ReactionsLayoutInBubble {
             return false;
         }
 
-        public void drawOverlay(Canvas canvas, float x, float y, float progress, float alpha, boolean drawOverlayScrim) {
-            if (particles == null) return;
-            if (!LiteMode.isEnabled(LiteMode.FLAG_ANIMATED_EMOJI_REACTIONS)) return;
+        public boolean drawOverlay(Canvas canvas, float x, float y, float progress, float alpha, boolean drawOverlayScrim) {
+            if (particles == null) return false;
+            if (!LiteMode.isEnabled(LiteMode.FLAG_ANIMATED_EMOJI_REACTIONS) || !LiteMode.isEnabled(LiteMode.FLAG_PARTICLES)) return false;
 
             AndroidUtilities.rectTmp.set(x, y, x + width, y + height);
             float rad = height / 2f;
 
-            tagPath.rewind();
-            tagPath.addRoundRect(AndroidUtilities.rectTmp, rad, rad, Path.Direction.CW);
-
             particles.bounds.set(AndroidUtilities.rectTmp);
             particles.bounds.inset(-dp(4), -dp(4));
             particles.setBounds(particles.bounds);
-            particles.process();
-            if (parentView != null) {
-                parentView.invalidate();
-            }
+            final boolean needsPostInvalidate = particles.process();
             particles.draw(canvas, ColorUtils.blendARGB(ColorUtils.setAlphaComponent(backgroundColor, 0xFF), ColorUtils.blendARGB(serviceTextColor, ColorUtils.setAlphaComponent(backgroundColor, 0xFF), .4f), getDrawServiceShaderBackground()));
 
-            canvas.save();
-            canvas.clipPath(tagPath);
-            particles.draw(canvas, textColor);
-            canvas.restore();
+            if (isSelected) {
+                tagPath.rewind();
+                tagPath.addRoundRect(AndroidUtilities.rectTmp, rad, rad, Path.Direction.CW);
+
+                canvas.save();
+                canvas.clipPath(tagPath);
+                particles.draw(canvas, textColor);
+                canvas.restore();
+            }
+
+            return needsPostInvalidate;
         }
 
         public void draw(Canvas canvas, float x, float y, float progress, float alpha, boolean drawOverlayScrim, boolean scrimProgressDirection, float scrimProgress) {
@@ -1055,6 +1062,12 @@ public class ReactionsLayoutInBubble {
                     serviceBackgroundColor = Color.TRANSPARENT;
                 }
             }
+
+            if (drawBgOnlyIfChosen) {
+                backgroundColor = 0;
+                serviceBackgroundColor = 0;
+            }
+
             updateColors(progress);
             textPaint.setColor(lastDrawnTextColor);
             if (textDrawable != null) {
@@ -1099,7 +1112,7 @@ public class ReactionsLayoutInBubble {
                 canvas.scale(bounceScale, bounceScale, x + w / 2f, y + height / 2f);
             }
             float rad = height / 2f;
-            if (getDrawServiceShaderBackground() > 0) {
+            if (getDrawServiceShaderBackground() > 0 && !drawBgOnlyIfChosen) {
                 Paint paint1 = Theme.getThemePaint(Theme.key_paint_chatActionBackground, resourcesProvider);
                 Paint paint2 = Theme.getThemePaint(Theme.key_paint_chatActionBackgroundDarken, resourcesProvider);
                 int oldAlpha = paint1.getAlpha();
@@ -1336,11 +1349,6 @@ public class ReactionsLayoutInBubble {
         }
 
         public void startAnimation() {
-//            if (paid && imageReceiver.getLottieAnimation() == null) {
-//                RLottieDrawable drawable = new RLottieDrawable(R.raw.star_reaction_click, "star_reaction_click", dp(40), dp(40));
-//                imageReceiver.setImageBitmap(drawable);
-//                return;
-//            }
             ImageReceiver imageReceiver;
             if (animatedEmojiDrawable != null && animatedEmojiDrawable.getImageReceiver() != null) {
                 imageReceiver = animatedEmojiDrawable.getImageReceiver();
@@ -1478,12 +1486,11 @@ public class ReactionsLayoutInBubble {
         }
         float eventX = event.getX();
         float eventY = event.getY();
-        if (parentView instanceof ChatMessageCell) {
+        if (parentView instanceof org.telegram.ui.Cells.IMessageCell) {
             eventY -= parentView.getPaddingTop();
-        } else if (parentView instanceof ChatActionCell) {
-            ChatActionCell actionCell = (ChatActionCell) parentView;
-            eventX -= actionCell.sideMenuWidth / 2f;
-            eventY -= parentView.getPaddingTop();
+            if (parentView instanceof ChatActionCell) {
+                eventX -= ((ChatActionCell) parentView).sideMenuWidth / 2f;
+            }
         }
         float x = eventX - this.x;
         float y = eventY - this.y;

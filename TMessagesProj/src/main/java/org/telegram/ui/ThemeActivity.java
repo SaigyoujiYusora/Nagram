@@ -72,6 +72,7 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.EmojiThemes;
@@ -116,7 +117,6 @@ import org.telegram.ui.web.WebBrowserSettings;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -151,13 +151,17 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
     boolean hasThemeAccents;
 
+    @Keep
     private int backgroundRow;
     private int textSizeHeaderRow;
+    @Keep
     private int textSizeRow;
     private int settingsRow;
     private int directShareRow;
+    @Keep
     private int sensitiveContentRow;
     private int raiseToSpeakRow;
+    @Keep
     private int raiseToListenRow;
     private int nextMediaTapRow;
     private int sendByEnterRow;
@@ -169,12 +173,15 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
     private int bluetoothScoRow;
     private int enableAnimationsRow;
     private int settings2Row;
+    @Keep
     private int changeUserColor;
 
     private int contactsReimportRow;
     private int contactsSortRow;
 
+    @Keep
     private int nightThemeRow;
+    @Keep
     private int browserRow;
     private int nightDisabledRow;
     private int nightScheduledRow;
@@ -195,6 +202,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
     private int newThemeInfoRow;
     private int themeHeaderRow;
     private int bubbleRadiusHeaderRow;
+    @Keep
     private int bubbleRadiusRow;
     private int bubbleRadiusInfoRow;
     private int chatListHeaderRow;
@@ -205,7 +213,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
     private int themeAccentListRow;
     private int themeInfoRow;
     private int chatBlurRow;
+    @Keep
     private int pauseOnRecordRow;
+    @Keep
     private int pauseOnMediaRow;
 
     private int swipeGestureHeaderRow;
@@ -215,16 +225,20 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
     private int selectThemeHeaderRow;
     private int themePreviewRow;
     private int editThemeRow;
+    @Keep
     private int createNewThemeRow;
     private int lastShadowRow;
+    @Keep
     private int stickersRow;
     private int stickersInfoRow;
     private int stickersSectionRow, mediaSoundSectionRow, otherSectionRow;
     private int mediaSoundHeaderRow, otherHeaderRow;
+    @Keep
     private int liteModeRow;
     private int liteModeInfoRow;
 
     private int appIconHeaderRow;
+    @Keep
     private int appIconSelectorRow;
     private int appIconShadowRow;
 
@@ -621,7 +635,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         Collections.sort(defaultThemes, (o1, o2) -> Integer.compare(o1.sortIndex, o2.sortIndex));
 
         if (currentType == THEME_TYPE_THEMES_BROWSER) {
-            selectThemeHeaderRow = rowCount++;
+            selectThemeHeaderRow = rowCount++; // TYPE_HEADER
             themeListRow2 = rowCount++;
             chatListInfoRow = rowCount++;
 
@@ -698,8 +712,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             distanceRow = rowCount++;
             otherSectionRow = rowCount++;
         } else {
-            nightDisabledRow = rowCount++;
-            nightScheduledRow = rowCount++;
+            nightDisabledRow = rowCount++;  // TYPE_THEME_TYPE
+            nightScheduledRow = rowCount++; // TYPE_THEME_TYPE
             nightAutomaticRow = rowCount++;
             if (Build.VERSION.SDK_INT >= 29) {
                 nightSystemDefaultRow = rowCount++;
@@ -836,6 +850,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         getNotificationCenter().addObserver(this, NotificationCenter.contentSettingsLoaded);
         getNotificationCenter().addObserver(this, NotificationCenter.themeUploadedToServer);
         getNotificationCenter().addObserver(this, NotificationCenter.themeUploadError);
+        getNotificationCenter().addObserver(this, NotificationCenter.webBrowserSettingsUpdate);
         if (currentType == THEME_TYPE_BASIC) {
             Theme.loadRemoteThemes(currentAccount, true);
             Theme.checkCurrentRemoteTheme(true);
@@ -859,6 +874,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         getNotificationCenter().removeObserver(this, NotificationCenter.contentSettingsLoaded);
         getNotificationCenter().removeObserver(this, NotificationCenter.themeUploadedToServer);
         getNotificationCenter().removeObserver(this, NotificationCenter.themeUploadError);
+        getNotificationCenter().removeObserver(this, NotificationCenter.webBrowserSettingsUpdate);
         Theme.saveAutoNightThemeConfig();
     }
 
@@ -871,6 +887,10 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 listView.invalidateViews();
             }
             updateMenuItem();
+        } else if (id == NotificationCenter.webBrowserSettingsUpdate) {
+            if (listAdapter != null && browserRow != -1) {
+                listAdapter.notifyItemChanged(browserRow);
+            }
         } else if (id == NotificationCenter.themeAccentListUpdated) {
             if (listAdapter != null && themeAccentListRow != -1) {
                 try {
@@ -929,9 +949,6 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(false);
-        if (AndroidUtilities.isTablet()) {
-            actionBar.setOccupyStatusBar(false);
-        }
         if (currentType == THEME_TYPE_THEMES_BROWSER) {
             actionBar.setTitle(getString("BrowseThemes", R.string.BrowseThemes));
             ActionBarMenu menu = actionBar.createMenu();
@@ -965,7 +982,10 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 });
             }
         } else {
-            actionBar.setTitle(getString("AutoNightTheme", R.string.AutoNightTheme));
+            actionBar.setTitle(getString(R.string.AutoNightTheme));
+        }
+        if (parentLayout != null && parentLayout.isRightLayout()) {
+            actionBar.setBackButtonImage(R.drawable.ic_ab_close);
         }
 
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -1086,11 +1106,13 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         fragmentView = frameLayout;
 
         listView = new RecyclerListView(context);
+        listView.setSections();
         listView.setLayoutManager(layoutManager = new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
         listView.setAdapter(listAdapter);
         ((DefaultItemAnimator) listView.getItemAnimator()).setDelayAnimations(false);
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        actionBar.setAdaptiveBackground(listView);
         listView.setOnItemClickListener((view, position, x, y) -> {
             if (position == enableAnimationsRow) {
                 SharedPreferences preferences = MessagesController.getGlobalMainSettings();
@@ -1393,15 +1415,16 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                         }
                         value = type + " " + value;
                     }
-                    checkCell.setTextAndValueAndIconAndCheck(getString("AutoNightTheme", R.string.AutoNightTheme), value, R.drawable.msg2_night_auto, enabled, 0, false, true);
+                    checkCell.setTextAndValueAndIconAndCheck(getString("AutoNightTheme", R.string.AutoNightTheme), value, R.drawable.menu_night_mode_24, enabled, 0, false, true);
                 } else {
                     presentFragment(new ThemeActivity(THEME_TYPE_NIGHT));
                 }
             } else if (position == browserRow) {
                 if (LocaleController.isRTL && x <= dp(76) || !LocaleController.isRTL && x >= view.getMeasuredWidth() - dp(76)) {
                     NotificationsCheckCell checkCell = (NotificationsCheckCell) view;
-                    SharedConfig.toggleInappBrowser();
-                    checkCell.setChecked(SharedConfig.inappBrowser);
+                    getMessagesController().toggleWebBrowserInAppEnabled();
+                    final boolean inAppBrowserEnabled = getMessagesController().isWebBrowserInAppEnabled();
+                    checkCell.setChecked(inAppBrowserEnabled);
                 } else {
                     presentFragment(new WebBrowserSettings(null));
                 }
@@ -1501,6 +1524,17 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         }
 
         return fragmentView;
+    }
+
+    @Override
+    public boolean isSupportEdgeToEdge() {
+        return true;
+    }
+
+    @Override
+    public void onInsets(int left, int top, int right, int bottom) {
+        listView.setPadding(0, 0, 0, bottom);
+        listView.setClipToPadding(false);
     }
 
     private void editTheme() {
@@ -2212,22 +2246,18 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             switch (viewType) {
                 case TYPE_TEXT_SETTING:
                     view = new TextSettingsCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_TEXT_INFO_PRIVACY:
                     view = new TextInfoPrivacyCell(mContext);
-                    view.setBackground(Theme.getThemedDrawableByKey(mContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
                     break;
                 case TYPE_SHADOW:
                     view = new ShadowSectionCell(mContext);
                     break;
                 case TYPE_THEME_TYPE:
                     view = new ThemeTypeCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_HEADER:
                     view = new HeaderCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_BRIGHTNESS:
                     view = new BrightnessControlCell(mContext, BrightnessControlCell.TYPE_DEFAULT) {
@@ -2246,15 +2276,12 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                             }
                         }
                     };
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_TEXT_CHECK:
                     view = new TextCheckCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_TEXT_SIZE:
                     view = new TextSizeCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_CHAT_LIST:
                     view = new ChatListCell(mContext) {
@@ -2263,11 +2290,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                             SharedConfig.setUseThreeLinesLayout(threeLines);
                         }
                     };
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_NIGHT_THEME:
                     view = new NotificationsCheckCell(mContext, 21, 60, true);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_THEME_LIST:
                     first = true;
@@ -2298,7 +2323,6 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                         }
                     };
                     accentsListView.setFocusable(false);
-                    accentsListView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     accentsListView.setItemAnimator(null);
                     accentsListView.setLayoutAnimation(null);
                     accentsListView.setPadding(dp(11), 0, dp(11), 0);
@@ -2416,12 +2440,10 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 }
                 case TYPE_BUBBLE_RADIUS:
                     view = new BubbleRadiusCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_TEXT_PREFERENCE:
                 default:
                     view = new TextCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_SWIPE_GESTURE:
                     view = new SwipeGestureSettingsView(mContext, currentAccount);
@@ -2504,7 +2526,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                         } else {
                             value = getString("DistanceUnitsMiles", R.string.DistanceUnitsMiles);
                         }
-                        cell.setTextAndValue(getString("DistanceUnits", R.string.DistanceUnits), value, updateDistance, true);
+                        cell.setTextAndValue(getString("DistanceUnits", R.string.DistanceUnits), value, updateDistance, otherSectionRow >= 0);
                         updateDistance = false;
                     } else if (position == searchEngineRow) {
                         cell.setTextAndValue(getString(R.string.SearchEngine), SearchEngine.getCurrent().name, updateSearchEngine, false);
@@ -2532,11 +2554,6 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                     break;
                 }
                 case TYPE_SHADOW: {
-                    if (position == nightTypeInfoRow && themeInfoRow == -1 || position == lastShadowRow || position == themeInfoRow && nightTypeInfoRow != -1 || position == saveToGallerySectionRow || position == settings2Row) {
-                        holder.itemView.setBackground(Theme.getThemedDrawableByKey(mContext, R.drawable.greydivider_bottom, Theme.key_windowBackgroundGrayShadow));
-                    } else {
-                        holder.itemView.setBackground(Theme.getThemedDrawableByKey(mContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
-                    }
                     break;
                 }
                 case TYPE_THEME_TYPE: {
@@ -2637,9 +2654,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                             }
                             value = type + " " + value;
                         }
-                        checkCell.setTextAndValueAndIconAndCheck(getString("AutoNightTheme", R.string.AutoNightTheme), value, R.drawable.msg2_night_auto, enabled, 0, false, true);
+                        checkCell.setTextAndValueAndIconAndCheck(getString("AutoNightTheme", R.string.AutoNightTheme), value, R.drawable.menu_night_mode_24, enabled, 0, false, true);
                     } else if (position == browserRow) {
-                        checkCell.setTextAndValueAndIconAndCheck(getString(R.string.InappBrowser), getString(R.string.InappBrowserInfo), R.drawable.msg2_language, SharedConfig.inappBrowser, 0, false, true);
+                        checkCell.setTextAndValueAndIconAndCheck(getString(R.string.InappBrowser), getString(R.string.InappBrowserInfo), R.drawable.msg2_language, getMessagesController().isWebBrowserInAppEnabled(), 0, false, true);
                     }
                     break;
                 }
@@ -2723,9 +2740,6 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             if (type == TYPE_THEME_TYPE) {
                 ((ThemeTypeCell) holder.itemView).setTypeChecked(holder.getAdapterPosition() == Theme.selectedAutoNightType);
             }
-            if (type != TYPE_TEXT_INFO_PRIVACY && type != TYPE_SHADOW) {
-                holder.itemView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-            }
         }
 
         @Override
@@ -2801,7 +2815,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_CELLBACKGROUNDCOLOR, new Class[]{TextSettingsCell.class, TextCheckCell.class, HeaderCell.class, BrightnessControlCell.class, ThemeTypeCell.class, TextSizeCell.class, BubbleRadiusCell.class, ChatListCell.class, NotificationsCheckCell.class, ThemesHorizontalListCell.class, TintRecyclerListView.class, TextCell.class, PeerColorActivity.ChangeNameColorCell.class, SwipeGestureSettingsView.class, DefaultThemesPreviewCell.class, AppIconsSelectorCell.class}, null, null, null, Theme.key_windowBackgroundWhite));
         themeDescriptions.add(new ThemeDescription(fragmentView, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_windowBackgroundGray));
 
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_actionBarDefault));
+//        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_actionBarDefault));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_LISTGLOWCOLOR, null, null, null, null, Theme.key_actionBarDefault));
         themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_ITEMSCOLOR, null, null, null, null, Theme.key_actionBarDefaultIcon));
         themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_TITLECOLOR, null, null, null, null, Theme.key_actionBarDefaultTitle));
@@ -2814,9 +2828,6 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
         themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{View.class}, Theme.dividerPaint, null, null, Theme.key_divider));
 
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_BACKGROUNDFILTER, new Class[]{ShadowSectionCell.class}, null, null, null, Theme.key_windowBackgroundGrayShadow));
-
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_BACKGROUNDFILTER, new Class[]{TextInfoPrivacyCell.class}, null, null, null, Theme.key_windowBackgroundGrayShadow));
         themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextInfoPrivacyCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteGrayText4));
 
         themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextSettingsCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteBlackText));

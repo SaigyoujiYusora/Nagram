@@ -170,7 +170,7 @@ public class ChatHistoryActivity extends BaseFragment {
         ActionBarMenu menu = actionBar.createMenu();
 
         // Add search button
-        searchItem = menu.addItem(3, R.drawable.ic_ab_search).setIsSearchField(true).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
+        searchItem = menu.addItem(3, R.drawable.msg_search).setIsSearchField(true).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
             @Override
             public void onSearchExpand() {
                 isSearchMode = true;
@@ -537,18 +537,20 @@ public class ChatHistoryActivity extends BaseFragment {
     }
 
     @Override
-    public boolean onBackPressed() {
+    public boolean onBackPressed(boolean invoked) {
         if (isSearchMode) {
-            try {
-                if (actionBar != null && actionBar.isSearchFieldVisible()) {
-                    actionBar.closeSearchField(false);
+            if (invoked) {
+                try {
+                    if (actionBar != null && actionBar.isSearchFieldVisible()) {
+                        actionBar.closeSearchField(false);
+                    }
+                } catch (Exception ignore) {
                 }
-            } catch (Exception ignore) {
+                exitSearchMode();
             }
-            exitSearchMode();
-            return true;
+            return false;
         }
-        return super.onBackPressed();
+        return super.onBackPressed(invoked);
     }
 
     private void refreshAllPages() {

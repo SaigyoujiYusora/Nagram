@@ -1,6 +1,7 @@
 package org.telegram.messenger.voip;
 
 import android.util.LongSparseArray;
+import android.util.SparseArray;
 
 import androidx.annotation.Nullable;
 
@@ -13,11 +14,12 @@ import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
+import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.json.TLJsonBuilder;
-import org.telegram.tgnet.TLMethod;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.json.TLJsonParser;
 import org.telegram.tgnet.tl.TL_phone;
+import org.telegram.tgnet.tl.TL_update;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -29,23 +31,24 @@ import java.util.concurrent.TimeUnit;
 public class GroupCallMessagesController extends BaseController {
 
     public interface CallMessageListener {
-        void onNewGroupCallMessage(GroupCallMessage message);
+        void onNewGroupCallMessage(long callId, GroupCallMessage message);
         void onPopGroupCallMessage();
     }
 
-    public void processUpdate(TLRPC.TL_updateGroupCallMessage update) {
+    public void processUpdate(TL_update.TL_updateGroupCallMessage update) {
         final long callId = update.call.id;
-        final long fromId = DialogObject.getPeerDialogId(update.from_id);
-        final long randomId = update.random_id;
+        final long fromId = DialogObject.getPeerDialogId(update.message.from_id);
+        final long id = update.message.id;
         if (getUserConfig().clientUserId == fromId) {
             return;
         }
 
-        final GroupCallMessage message = new GroupCallMessage(currentAccount, fromId, randomId, update.message);
+        // TODO: support ids
+        final GroupCallMessage message = new GroupCallMessage(currentAccount, fromId, id, update.message.message);
         AndroidUtilities.runOnUIThread(() -> pushMessageToList(callId, message));
     }
 
-    public void processUpdate(TLRPC.TL_updateGroupCallEncryptedMessage update) {
+    public void processUpdate(TL_update.TL_updateGroupCallEncryptedMessage update) {
         final long callId = update.call.id;
         final long fromId = DialogObject.getPeerDialogId(update.from_id);
         final byte[] encrypted = update.encrypted_message;
@@ -80,17 +83,17 @@ public class GroupCallMessagesController extends BaseController {
         });
     }
 
-    public boolean sendCallMessage(long sendAsPeerId, TLRPC.TL_textWithEntities message, TLRPC.InputGroupCall inputGroupCall) {
+    public boolean sendCallMessage(long sendAsPeerId, TLRPC.TL_textWithEntities message, long callId, TLRPC.InputGroupCall inputGroupCall) {
         VoIPService service = VoIPService.getSharedInstance();
         if (service == null || service.getAccount() != currentAccount) {
             return false;
         }
 
         final long randomId = getSendMessagesHelper().getNextRandomId();
-        final TLMethod<TLRPC.Bool> request;
+        final TLObject request;
         if (service.isConference()) {
             if (service.conference == null || service.conference.groupCall == null) return false;
-            if (service.conference.groupCall.id != inputGroupCall.id) return false;
+            if (service.conference.groupCall.id != callId) return false;
 
             final long localCallId = service.conference.getCallId();
             if (localCallId == -1) return false;
@@ -123,8 +126,31 @@ public class GroupCallMessagesController extends BaseController {
             request = req;
         }
 
-        pushMessageToList(inputGroupCall.id, new GroupCallMessage(currentAccount, sendAsPeerId, randomId, message));
-        getConnectionsManager().sendRequestTyped(request, (response, error) -> {});
+        GroupCallMessage sendingGroupCallMessage = new GroupCallMessage(currentAccount, sendAsPeerId, randomId, message);
+        sendingGroupCallMessage.setIsOut(true);
+        pushMessageToList(callId, sendingGroupCallMessage);
+
+        final Runnable markMessageAsDelayed = () -> {
+            sendingGroupCallMessage.setIsSendDelayed(true);
+            sendingGroupCallMessage.notifyStateUpdate();
+        };
+
+        AndroidUtilities.runOnUIThread(markMessageAsDelayed, 1000);
+        getConnectionsManager().sendRequest(request, (response, error) -> {
+            AndroidUtilities.cancelRunOnUIThread(markMessageAsDelayed);
+            sendingGroupCallMessage.setIsSendDelayed(false);
+            if (response instanceof TLRPC.Bool) {
+                if (response instanceof TLRPC.TL_boolTrue) {
+                    sendingGroupCallMessage.setIsSendConfirmed(true);
+                } else {
+                    sendingGroupCallMessage.setIsSendError(true);
+                }
+            } else if (response instanceof TLRPC.Updates) {
+                sendingGroupCallMessage.setIsSendConfirmed(true);
+                getMessagesController().processUpdates((TLRPC.Updates) response, false);
+            }
+            AndroidUtilities.runOnUIThread(sendingGroupCallMessage::notifyStateUpdate);
+        });
 
         return true;
     }
@@ -177,13 +203,13 @@ public class GroupCallMessagesController extends BaseController {
         List<CallMessageListener> listeners = callMessagesListeners.get(callId);
         if (listeners != null) {
             for (CallMessageListener listener: listeners) {
-                listener.onNewGroupCallMessage(message);
+                listener.onNewGroupCallMessage(callId, message);
             }
         }
         listeners = callMessagesListeners.get(0);
         if (listeners != null) {
             for (CallMessageListener listener: listeners) {
-                listener.onNewGroupCallMessage(message);
+                listener.onNewGroupCallMessage(callId, message);
             }
         }
 
@@ -266,15 +292,15 @@ public class GroupCallMessagesController extends BaseController {
 
     /* * */
 
-    private static volatile GroupCallMessagesController[] Instance = new GroupCallMessagesController[UserConfig.MAX_ACCOUNT_COUNT];
+    private static volatile SparseArray<GroupCallMessagesController> Instance = new SparseArray<>();
 
     public static GroupCallMessagesController getInstance(int num) {
-        GroupCallMessagesController localInstance = Instance[num];
+        GroupCallMessagesController localInstance = Instance.get(num);
         if (localInstance == null) {
             synchronized (GroupCallMessagesController.class) {
-                localInstance = Instance[num];
+                localInstance = Instance.get(num);
                 if (localInstance == null) {
-                    Instance[num] = localInstance = new GroupCallMessagesController(num);
+                    Instance.set(num, localInstance = new GroupCallMessagesController(num));
                 }
             }
         }

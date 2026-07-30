@@ -138,7 +138,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
         }
         MessageObject avatarObject = null;
         Bitmap bitmap;
-        if (photoEntry.isVideo || photoEntry.editedInfo != null) {
+        if ((photoEntry.isVideo || photoEntry.editedInfo != null) && !photoEntry.isLivePhoto()) {
             TLRPC.TL_message message = new TLRPC.TL_message();
             message.id = 0;
             message.message = "";
@@ -429,7 +429,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
             }
 
             @Override
-            public void actionButtonPressed(boolean canceled, boolean notify, int scheduleDate) {
+            public void actionButtonPressed(boolean canceled, boolean notify, int scheduleDate, int scheduleRepeatPeriod) {
                 if (photos.isEmpty() || delegate == null || sendPressed || canceled) {
                     return;
                 }
@@ -507,7 +507,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
             chatAttachAlert.setDelegate(new ChatAttachAlert.ChatAttachViewDelegate() {
 
                 @Override
-                public void didPressedButton(int button, boolean arg, boolean notify, int scheduleDate, long effectId, boolean invertMedia, boolean forceDocument, long payStars) {
+                public void didPressedButton(int button, boolean arg, boolean notify, int scheduleDate, int scheduleRepeatPeriod, long effectId, boolean invertMedia, boolean forceDocument, long payStars) {
                     if (parentFragment == null || parentFragment.getParentActivity() == null || chatAttachAlert == null) {
                         return;
                     }
@@ -531,7 +531,10 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
                                 info.thumbPath = photoEntry.thumbPath;
                                 info.coverPath = photoEntry.coverPath;
                                 info.videoEditedInfo = photoEntry.editedInfo;
+                                info.isLivePhoto = photoEntry.isLivePhoto();
                                 info.isVideo = photoEntry.isVideo;
+                                info.livePhotoVideoOffset = photoEntry.livePhotoVideoOffset;
+                                info.discardLivePhoto = true;
                                 info.caption = photoEntry.caption != null ? photoEntry.caption.toString() : null;
                                 info.entities = photoEntry.entities;
                                 info.masks = photoEntry.stickers;
@@ -622,7 +625,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
             SendMessagesHelper.SendingMediaInfo info = photos.get(0);
             Bitmap bitmap = null;
             MessageObject avatarObject = null;
-            if (info.isVideo || info.videoEditedInfo != null) {
+            if ((info.isVideo || info.videoEditedInfo != null) && !info.isLivePhoto) {
                 TLRPC.TL_message message = new TLRPC.TL_message();
                 message.id = 0;
                 message.message = "";
@@ -819,7 +822,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
         PhotoViewer.getInstance().setParentActivity(parentFragment);
         PhotoViewer.getInstance().openPhotoForSelect(arrayList, 0, PhotoViewer.SELECT_TYPE_AVATAR, false, new PhotoViewer.EmptyPhotoViewerProvider() {
             @Override
-            public void sendButtonPressed(int index, VideoEditedInfo videoEditedInfo, boolean notify, int scheduleDate, boolean forceDocument) {
+            public void sendButtonPressed(int index, VideoEditedInfo videoEditedInfo, boolean notify, int scheduleDate, int scheduleRepeatPeriod, boolean forceDocument) {
                 MediaController.PhotoEntry photoEntry = (MediaController.PhotoEntry) arrayList.get(0);
                 processEntry(photoEntry);
             }

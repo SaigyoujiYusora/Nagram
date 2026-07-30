@@ -5,7 +5,6 @@ import static org.telegram.messenger.LocaleController.getString;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Base64;
-import android.util.Log;
 import android.util.SparseBooleanArray;
 
 import androidx.annotation.IntDef;
@@ -22,8 +21,8 @@ import org.json.JSONObject;
 import org.telegram.messenger.voip.VoIPGroupNotification;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.NativeByteBuffer;
-import org.telegram.tgnet.SerializedData;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.tgnet.tl.TL_update;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -38,12 +37,14 @@ import xyz.nextalone.nagram.NaConfig;
 public class PushListenerController {
     public static final int PUSH_TYPE_FIREBASE = 2,
         PUSH_TYPE_SIMPLE = 4,
+        PUSH_TYPE_WEB = 10,
         PUSH_TYPE_HUAWEI = 13;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({
             PUSH_TYPE_FIREBASE,
             PUSH_TYPE_SIMPLE,
+            PUSH_TYPE_WEB,
             PUSH_TYPE_HUAWEI
     })
     public @interface PushType {}
@@ -93,6 +94,52 @@ public class PushListenerController {
                         ConnectionsManager.getInstance(currentAccount).sendRequest(req, null);
                     }
                     AndroidUtilities.runOnUIThread(() -> MessagesController.getInstance(currentAccount).registerForPush(pushType, token));
+                }
+            }
+        });
+    }
+
+    /**
+     * Registers a Simple Push (token_type=4) endpoint URL with Telegram for all active accounts.
+     * Simple Push is a plain PUT wake-up with no encrypted payload, used by Telegram to notify
+     * about events where no content can be included (e.g., encrypted chats).
+     *
+     * Unlike sendRegistrationToServer(), this does NOT overwrite SharedConfig.pushString/pushType
+     * (which remain set to the primary Web Push type=10 registration).
+     */
+    public static void sendSimplePushRegistration(String token) {
+        if (TextUtils.isEmpty(token)) {
+            return;
+        }
+        NaConfig.INSTANCE.getPushServiceTypeUnifiedSimple().setConfigString(token);
+        Utilities.stageQueue.postRunnable(() -> {
+            for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                UserConfig userConfig = UserConfig.getInstance(a);
+                if (userConfig.getClientUserId() != 0) {
+                    final int currentAccount = a;
+                    AndroidUtilities.runOnUIThread(() ->
+                            MessagesController.getInstance(currentAccount).registerSimplePush(token));
+                }
+            }
+        });
+    }
+
+    public static void unregisterSimplePush() {
+        // Capture the token BEFORE clearing: the runnable is async on stageQueue, so reading
+        // SharedConfig.pushStringSimple there would see the already-cleared empty value and
+        // the unregisterDevice request would never be sent.
+        String token = NaConfig.INSTANCE.getPushServiceTypeUnifiedSimple().String();
+        NaConfig.INSTANCE.getPushServiceTypeUnifiedSimple().setConfigString("");
+        if (TextUtils.isEmpty(token)) {
+            return;
+        }
+        Utilities.stageQueue.postRunnable(() -> {
+            for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                UserConfig userConfig = UserConfig.getInstance(a);
+                if (userConfig.getClientUserId() != 0) {
+                    final int currentAccount = a;
+                    AndroidUtilities.runOnUIThread(() ->
+                            MessagesController.getInstance(currentAccount).unregisterSimplePush(token));
                 }
             }
         });
@@ -246,7 +293,7 @@ public class PushListenerController {
                             return;
                         }
                         case "MESSAGE_ANNOUNCEMENT": {
-                            TLRPC.TL_updateServiceNotification update = new TLRPC.TL_updateServiceNotification();
+                            TL_update.TL_updateServiceNotification update = new TL_update.TL_updateServiceNotification();
                             update.popup = false;
                             update.flags = 2;
                             update.inbox_date = (int) (time / 1000);
@@ -273,6 +320,45 @@ public class PushListenerController {
                         case "GEO_LIVE_PENDING": {
                             Utilities.stageQueue.postRunnable(() -> LocationController.getInstance(accountFinal).setNewLocationEndWatchTime());
                             countDownLatch.countDown();
+                            return;
+                        }
+                        case "OAUTH_REQUEST": {
+                            String[] args;
+                            if (json.has("loc_args")) {
+                                JSONArray loc_args = json.getJSONArray("loc_args");
+                                args = new String[loc_args.length()];
+                                for (int a = 0; a < args.length; a++) {
+                                    args[a] = loc_args.getString(a);
+                                }
+                            } else {
+                                return;
+                            }
+                            if (args.length < 2) return;
+
+                            final String data_url = custom.optString("url");
+                            if (TextUtils.isEmpty(data_url)) return;
+
+                            final long dialogId = UserObject.OAUTH; // UserConfig.getInstance(currentAccount).getClientUserId();
+                            final String messageText = LocaleController.formatString(R.string.BotAuthNotification, args[0], args[1]);
+
+                            final TLRPC.TL_message messageOwner = new TLRPC.TL_message();
+                            messageOwner.id = Integer.MAX_VALUE - 10;
+                            messageOwner.random_id = Long.MAX_VALUE - 10L;
+                            messageOwner.message = messageText;
+                            messageOwner.date = (int) (time / 1000);
+                            messageOwner.dialog_id = dialogId;
+                            messageOwner.peer_id = new TLRPC.TL_peerUser();
+                            messageOwner.peer_id.user_id = dialogId;
+                            messageOwner.flags |= 256;
+                            messageOwner.from_id = messageOwner.peer_id;
+                            messageOwner.silent = custom.has("silent") && custom.getInt("silent") != 0;
+
+                            final MessageObject messageObject = new MessageObject(currentAccount, messageOwner, messageText, data_url, null, true, false, false, false);
+                            messageObject.isOauthPush = true;
+                            ArrayList<MessageObject> arrayList = new ArrayList<>();
+                            arrayList.add(messageObject);
+                            FileLog.d("PushListenerController push OAUTH notification to NotificationsController of " + messageOwner.dialog_id);
+                            NotificationsController.getInstance(currentAccount).processNewMessages(arrayList, true, true, countDownLatch);
                             return;
                         }
                     }
@@ -344,13 +430,13 @@ public class PushListenerController {
                                 FileLog.d(tag + " received read notification max_id = " + max_id + " for dialogId = " + dialogId);
                             }
                             if (channel_id != 0) {
-                                TLRPC.TL_updateReadChannelInbox update = new TLRPC.TL_updateReadChannelInbox();
+                                TL_update.TL_updateReadChannelInbox update = new TL_update.TL_updateReadChannelInbox();
                                 update.channel_id = channel_id;
                                 update.max_id = max_id;
                                 update.still_unread_count = 0;
                                 updates.add(update);
                             } else {
-                                TLRPC.TL_updateReadHistoryInbox update = new TLRPC.TL_updateReadHistoryInbox();
+                                TL_update.TL_updateReadHistoryInbox update = new TL_update.TL_updateReadHistoryInbox();
                                 if (user_id != 0) {
                                     update.peer = new TLRPC.TL_peerUser();
                                     update.peer.user_id = user_id;
@@ -439,7 +525,7 @@ public class PushListenerController {
                             }
 
                             int story_id = -1;
-                            if (loc_key.equals("STORY_NOTEXT") || loc_key.equals("STORY_HIDDEN_AUTHOR")) {
+                            if (loc_key.equals("STORY_NOTEXT") || loc_key.equals("STORY_LIVE") || loc_key.equals("STORY_HIDDEN_AUTHOR")) {
                                 if (custom.has("story_id")) {
                                     story_id = custom.getInt("story_id");
                                 }
@@ -496,6 +582,12 @@ public class PushListenerController {
                                     switch (loc_key) {
                                         case "STORY_NOTEXT": {
                                             messageText = getString(R.string.StoryNotificationSingle);
+                                            message1 = null;
+                                            msg_id = story_id;
+                                            break;
+                                        }
+                                        case "STORY_LIVE": {
+                                            messageText = getString(R.string.StoryLiveNotificationSingle);
                                             message1 = null;
                                             msg_id = story_id;
                                             break;
@@ -1428,6 +1520,7 @@ public class PushListenerController {
                                     messageObject.isStoryReactionPush = loc_key.startsWith("REACT_STORY");
                                     messageObject.isReactionPush = !messageObject.isStoryReactionPush && (loc_key.startsWith("REACT_") || loc_key.startsWith("CHAT_REACT_"));
                                     messageObject.isStoryPush = loc_key.equals("STORY_NOTEXT") || loc_key.equals("STORY_HIDDEN_AUTHOR");
+                                    messageObject.isLiveStoryPush = loc_key.equals("STORY_LIVE");
                                     messageObject.isStoryMentionPush = loc_key.equals("MESSAGE_STORY_MENTION");
                                     messageObject.isStoryPushHidden = loc_key.equals("STORY_HIDDEN_AUTHOR");
                                     ArrayList<MessageObject> arrayList = new ArrayList<>();

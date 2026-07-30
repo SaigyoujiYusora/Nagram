@@ -19,11 +19,13 @@ import tw.nekomimi.nekogram.settings.BaseNekoSettingsActivity;
 import tw.nekomimi.nekogram.settings.BaseNekoXSettingsActivity;
 import tw.nekomimi.nekogram.settings.NekoChatSettingsActivity;
 import tw.nekomimi.nekogram.settings.NekoAccountSettingsActivity;
+import tw.nekomimi.nekogram.settings.NekoDebugSettingsActivity;
 import tw.nekomimi.nekogram.settings.NekoEmojiSettingsActivity;
 import tw.nekomimi.nekogram.settings.NekoExperimentalSettingsActivity;
 import tw.nekomimi.nekogram.settings.NekoGeneralSettingsActivity;
 import tw.nekomimi.nekogram.settings.NekoPasscodeSettingsActivity;
 import tw.nekomimi.nekogram.settings.NekoSettingsActivity;
+import xyz.nextalone.nagram.network.NetworkLogActivity;
 
 public class SettingsHelper {
 
@@ -51,12 +53,16 @@ public class SettingsHelper {
                     fragment = nekox_fragment = new NekoAccountSettingsActivity();
                     break;
                 case "about":
-                    fragment = new NekoSettingsActivity().startOnAbout();
+                    fragment = neko_fragment = new NekoSettingsActivity();
                     break;
                 case "chat":
                 case "chats":
                 case "c":
                     fragment = nekox_fragment = new NekoChatSettingsActivity();
+                    break;
+                case "debug":
+                case "d":
+                    fragment = nekox_fragment = new NekoDebugSettingsActivity();
                     break;
                 case "experimental":
                 case "e":
@@ -68,6 +74,10 @@ public class SettingsHelper {
                 case "general":
                 case "g":
                     fragment = nekox_fragment = new NekoGeneralSettingsActivity();
+                    break;
+                case "network_logs":
+                case "n":
+                    fragment = new NetworkLogActivity();
                     break;
                 case "recent_dialogs":
                 case "r":
@@ -117,7 +127,8 @@ public class SettingsHelper {
         fragments.add(new NekoGeneralSettingsActivity());
         fragments.add(new NekoChatSettingsActivity());
         fragments.add(new NekoExperimentalSettingsActivity());
-        String n_title = LocaleController.getString(R.string.NekoSettings);
+        fragments.add(new NekoDebugSettingsActivity());
+        String n_title = LocaleController.getString(R.string.N_Config);
         for (BaseNekoXSettingsActivity fragment: fragments) {
             int uid = fragment.getBaseGuid();
             int drawable = fragment.getDrawable();
@@ -134,8 +145,11 @@ public class SettingsHelper {
                     continue;
                 }
                 Runnable open = () -> {
-                    callback.presentFragment(fragment);
-                    AndroidUtilities.runOnUIThread(() -> fragment.scrollToRow(key, null));
+                    try {
+                        BaseNekoXSettingsActivity f = fragment.getClass().getDeclaredConstructor().newInstance();
+                        callback.presentFragment(f);
+                        AndroidUtilities.runOnUIThread(() -> f.scrollToRow(key, null));
+                    } catch (Exception ignored) {}
                 };
                 SettingsSearchResult result = new SettingsSearchResult(
                         guid, title, n_title, f_title, drawable, open
