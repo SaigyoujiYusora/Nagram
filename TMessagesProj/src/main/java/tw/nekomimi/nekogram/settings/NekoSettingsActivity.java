@@ -5,7 +5,6 @@ import static tw.nekomimi.nekogram.utils.UpdateUtil.channelUsernameTips;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.view.View;
 
@@ -15,7 +14,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.jakewharton.processphoenix.ProcessPhoenix;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -29,17 +27,20 @@ import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.TextCell;
 import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.DocumentSelectActivity;
-import org.telegram.ui.LaunchActivity;
 
 import java.io.File;
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 import kotlin.text.StringsKt;
 import tw.nekomimi.nekogram.DatacenterActivity;
+import tw.nekomimi.nekogram.helpers.AppRestartHelper;
 import tw.nekomimi.nekogram.helpers.CloudSettingsHelper;
 import tw.nekomimi.nekogram.helpers.PasscodeHelper;
 import tw.nekomimi.nekogram.utils.AlertUtil;
@@ -47,9 +48,15 @@ import tw.nekomimi.nekogram.utils.EnvUtil;
 import tw.nekomimi.nekogram.utils.FileUtil;
 import tw.nekomimi.nekogram.utils.GsonUtil;
 import tw.nekomimi.nekogram.utils.ShareUtil;
+import xyz.nextalone.nagram.NkmrConfig;
 import xyz.nextalone.nagram.network.NetworkLogActivity;
 
 public class NekoSettingsActivity extends BaseNekoSettingsActivity {
+
+    private static final Set<String> EXCLUDED_NKMR_CONFIG_KEYS = new HashSet<>(Arrays.asList(
+            "ExtendedFeatureUnlockedToken",
+            "ShowHiddenFeature"
+    ));
 
     private int categoriesRow;
     private int generalRow;
@@ -72,6 +79,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
     private int settingsRow;
     private int importSettingsRow;
     private int exportSettingsRow;
+    private int resetSettingsRow;
     private int settings2Row;
 
     @Override
@@ -114,6 +122,18 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
         }  else if (position == importSettingsRow) {
             DocumentSelectActivity activity = getDocumentSelectActivity(getParentActivity());
             presentFragment(activity);
+        } else if (position == resetSettingsRow) {
+            AlertUtil.showConfirm(getParentActivity(),
+                    LocaleController.getString(R.string.ResetSettingsAlert),
+                    R.drawable.msg_reset,
+                    LocaleController.getString(R.string.Reset),
+                    true,
+                    () -> {
+                        ApplicationLoader.applicationContext.getSharedPreferences("nekocloud", Activity.MODE_PRIVATE).edit().clear().commit();
+                        ApplicationLoader.applicationContext.getSharedPreferences("nekox_config", Activity.MODE_PRIVATE).edit().clear().commit();
+                        NkmrConfig.clear();
+                        AppRestartHelper.triggerRebirth();
+                    });
         } else if (position == exportSettingsRow) {
             backupSettings();
         }
@@ -163,6 +183,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
         settingsRow = addRow("settings");
         importSettingsRow = addRow("importSettings");
         exportSettingsRow = addRow("exportSettings");
+        resetSettingsRow = addRow("resetSettings");
         settings2Row = addRow();
     }
 
@@ -193,6 +214,8 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
                         textCell.setText(LocaleController.getString(R.string.ImportSettings), divider);
                     } else if (position == exportSettingsRow) {
                         textCell.setText(LocaleController.getString(R.string.BackupSettings), divider);
+                    } else if (position == resetSettingsRow) {
+                        textCell.setText(LocaleController.getString(R.string.ResetSettings), divider);
                     }
                     break;
                 }
@@ -334,7 +357,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
         spToJSON("mainconfig", configJson, mainconfig::contains);
         spToJSON("themeconfig", configJson, null);
 
-        spToJSON("nkmrcfg", configJson, null);
+        spToJSON("nkmrcfg", configJson, key -> shouldTransferPreference("nkmrcfg", key));
         spToJSON("nekodialogconfig", configJson, null);
 
         return indentSpaces > 0 ? configJson.toString(indentSpaces): configJson.toString();
@@ -354,6 +377,10 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
             jsonConfig.put(key, entry.getValue());
         }
         object.put(sp, jsonConfig);
+    }
+
+    private static boolean shouldTransferPreference(String preferencesName, String key) {
+        return !"nkmrcfg".equals(preferencesName) || !EXCLUDED_NKMR_CONFIG_KEYS.contains(key);
     }
 
     private DocumentSelectActivity getDocumentSelectActivity(Activity parent) {
@@ -398,7 +425,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
             AlertDialog restart = new AlertDialog(context, 0);
             restart.setTitle(LocaleController.getString(R.string.NekoX));
             restart.setMessage(LocaleController.getString(R.string.RestartAppToTakeEffect));
-            restart.setPositiveButton(LocaleController.getString(R.string.OK), (__, ___) -> ProcessPhoenix.triggerRebirth(context, new Intent(context, LaunchActivity.class)));
+            restart.setPositiveButton(LocaleController.getString(R.string.OK), (__, ___) -> AppRestartHelper.triggerRebirth());
             restart.show();
         } catch (Exception e) {
             AlertUtil.showSimpleAlert(context, e);
@@ -408,10 +435,20 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
 
     public static void importSettings(JsonObject configJson) throws JSONException {
         for (Map.Entry<String, JsonElement> element : configJson.entrySet()) {
-            SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(element.getKey(), Activity.MODE_PRIVATE);
+            String preferencesName = element.getKey();
+            SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(preferencesName, Activity.MODE_PRIVATE);
             SharedPreferences.Editor editor = preferences.edit();
             for (Map.Entry<String, JsonElement> config : ((JsonObject) element.getValue()).entrySet()) {
                 String key = config.getKey();
+                String preferenceKey = key;
+                if (preferenceKey.endsWith("_long")) {
+                    preferenceKey = StringsKt.substringBeforeLast(preferenceKey, "_long", preferenceKey);
+                } else if (preferenceKey.endsWith("_float")) {
+                    preferenceKey = StringsKt.substringBeforeLast(preferenceKey, "_float", preferenceKey);
+                }
+                if (!shouldTransferPreference(preferencesName, preferenceKey)) {
+                    continue;
+                }
                 JsonPrimitive value = (JsonPrimitive) config.getValue();
                 if (value.isBoolean()) {
                     editor.putBoolean(key, value.getAsBoolean());
@@ -438,5 +475,6 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
             }
             editor.commit();
         }
+        NkmrConfig.compact();
     }
 }

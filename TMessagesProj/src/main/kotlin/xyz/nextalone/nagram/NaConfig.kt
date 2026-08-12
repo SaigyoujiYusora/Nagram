@@ -1,10 +1,8 @@
 package xyz.nextalone.nagram
 
-import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Base64
-import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.LocaleController
 import org.telegram.messenger.R
 import tw.nekomimi.nekogram.config.ConfigItem
@@ -18,10 +16,7 @@ object NaConfig {
     const val TAG =
         "NextAlone"
     val preferences: SharedPreferences =
-        ApplicationLoader.applicationContext.getSharedPreferences(
-            "nkmrcfg",
-            Context.MODE_PRIVATE
-        )
+        NkmrConfig.preferences
     val sync =
         Any()
     private var configLoaded =
@@ -1173,6 +1168,18 @@ object NaConfig {
             ConfigItem.configTypeString,
             ""
         )
+    val llmTranslationPrompt =
+        addConfig(
+            "LLMTranslationPrompt",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val llmUseContext =
+        addConfig(
+            "LLMUseContext",
+            ConfigItem.configTypeBool,
+            false
+        )
     val llmTemperature =
         addConfig(
             "LLMTemperature",
@@ -1184,6 +1191,12 @@ object NaConfig {
             "MainTabsStyle",
             ConfigItem.configTypeInt,
             0
+        )
+    val hideTabBarPermissionWarnings =
+        addConfig(
+            "HideTabBarPermissionWarnings",
+            ConfigItem.configTypeBool,
+            false
         )
     val showRecentChatsOnTabLongPress =
         addConfig(
@@ -1201,7 +1214,7 @@ object NaConfig {
         addConfig(
             "CustomDialogsMenu",
             ConfigItem.configTypeInt,
-            0
+            59
         )
     val customDialogsMenuTheme =
         addConfig(
@@ -1281,6 +1294,18 @@ object NaConfig {
             "ShowRecentForwardTab",
             ConfigItem.configTypeBool,
             false
+        )
+    val disableProfileAvatarBlur =
+        addConfig(
+            "DisableProfileAvatarBlur",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val extendedFeatureUnlockedToken =
+        addConfig(
+            "ExtendedFeatureUnlockedToken",
+            ConfigItem.configTypeString,
+            ""
         )
 
     private fun addConfig(
@@ -1420,7 +1445,7 @@ object NaConfig {
                 }
                 if (o.type == ConfigItem.configTypeBoolLinkInt) {
                     o as ConfigItemKeyLinked
-                    o.changedFromKeyLinked(preferences.getInt(o.keyLinked.key, 0))
+                    o.changedFromKeyLinked(o.keyLinked.Int())
                 }
             }
             configLoaded =
