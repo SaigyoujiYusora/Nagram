@@ -2478,6 +2478,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     swipeFolderBack = false;
                     return makeMovementFlags(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0);
                 } else {
+                    if (NaConfig.INSTANCE.getDisableChatListSwipeGesture().Bool()) {
+                        return 0;
+                    }
                     int currentDialogsType = initialDialogsType;
                     try {
                         currentDialogsType = parentPage.dialogsAdapter.getDialogsType();
@@ -3620,7 +3623,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     if (self != null && self.first_name != null) title = self.first_name;
                 }
                 actionBar.centerTitle(false);
-                if (title.equals(getString(R.string.NekoX))) {
+                if (title.equals(getString(R.string.NekoX)) && !NaConfig.INSTANCE.getUseSystemFontInTitle().Bool()) {
                     logoDrawable = context.getResources().getDrawable(R.drawable.nagram_logo_2).mutate();
                     logoDrawable.setBounds(0, dp(2), logoDrawable.getIntrinsicWidth(), dp(2) + logoDrawable.getIntrinsicHeight());
                     logoDrawable.setColorFilter(getThemedColor(Theme.key_telegram_color_dialogsLogo), PorterDuff.Mode.MULTIPLY);

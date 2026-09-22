@@ -3503,7 +3503,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 parentAlert.getPhotoPreviewLayout().invalidateGroupsView();
             }
         } else if (id == open_in) {
-            if (NaConfig.INSTANCE.getUseSystemPhotoPicker().Bool() && openSystemPhotoPicker()) {
+            if (openSystemPhotoPicker()) {
                 return;
             }
             try {
@@ -3988,7 +3988,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     }
 
     public void setCheckCameraWhenShown(boolean checkCameraWhenShown) {
-        this.checkCameraWhenShown = checkCameraWhenShown && !NekoConfig.disableInstantCamera.Bool();
+        this.checkCameraWhenShown = checkCameraWhenShown && !NekoConfig.disableInstantCamera.Bool() && !NaConfig.INSTANCE.getHideInstantCamera().Bool();
     }
 
     @Override
@@ -4204,7 +4204,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
     @Override
     public void onOpenAnimationEnd() {
-        checkCamera(parentAlert != null && parentAlert.baseFragment instanceof ChatActivity && !NekoConfig.disableInstantCamera.Bool());
+        checkCamera(parentAlert != null && parentAlert.baseFragment instanceof ChatActivity && !NekoConfig.disableInstantCamera.Bool() && !NaConfig.INSTANCE.getHideInstantCamera().Bool());
     }
 
     @Override
