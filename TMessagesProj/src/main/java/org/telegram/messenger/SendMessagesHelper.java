@@ -130,6 +130,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import top.qwq2333.nullgram.utils.StringUtils;
+import tw.nekomimi.nekogram.helpers.NoQuoteForwardHelper;
 import xyz.nextalone.nagram.NaConfig;
 
 public class SendMessagesHelper extends BaseController implements NotificationCenter.NotificationCenterDelegate {
@@ -2155,6 +2156,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             ArrayList<TLRPC.Message> arr = new ArrayList<>();
             ArrayList<Long> randomIds = new ArrayList<>();
             ArrayList<Integer> ids = new ArrayList<>();
+            ArrayList<MessageObject> sourceObjs = new ArrayList<>();
             boolean fwdEphemeral = false;
             LongSparseArray<TLRPC.Message> messagesByRandomIds = new LongSparseArray<>();
             TLRPC.InputPeer inputPeer = getMessagesController().getInputPeer(peer);
@@ -2523,6 +2525,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 newMsgObj.wasJustSent = true;
                 objArr.add(newMsgObj);
                 arr.add(newMsg);
+                sourceObjs.add(msgObj);
                 StarsController.getInstance(currentAccount).beforeSendingMessage(newMsgObj);
 
                 if (msgObj.replyMessageObject != null) {
@@ -2608,6 +2611,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
 
                     final ArrayList<TLRPC.Message> newMsgObjArr = arr;
                     final ArrayList<MessageObject> newMsgArr = new ArrayList<>(objArr);
+                    final ArrayList<MessageObject> sourceMsgArr = new ArrayList<>(sourceObjs);
                     final LongSparseArray<TLRPC.Message> messagesByRandomIdsFinal = messagesByRandomIds;
                     final boolean scheduledOnline = scheduleDate == 0x7FFFFFFE;
                     final Runnable send = () -> {
@@ -2761,6 +2765,18 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                     getMessagesController().processUpdates(updates, false);
                                 }
                                 getStatsController().incrementSentItemsCount(ApplicationLoader.getCurrentNetworkType(), StatsController.TYPE_MESSAGES, sentCount);
+                            } else if (forwardFromMyName && NoQuoteForwardHelper.canFallbackToCopy(error)) {
+                                // NoQuote forward failed (e.g. CHAT_FORWARDS_RESTRICTED): don't rely on the server
+                                // forward flag, drop the local placeholders and copy files / formatted text instead
+                                AndroidUtilities.runOnUIThread(() -> {
+                                    cancelSendingMessage(newMsgArr);
+                                    for (int a1 = 0; a1 < newMsgArr.size(); a1++) {
+                                        processSentMessage(newMsgArr.get(a1).getId());
+                                    }
+                                    NoQuoteForwardHelper.showFallbackToast(error);
+                                    NoQuoteForwardHelper.getInstance(currentAccount).copyMessages(sourceMsgArr, peer, hideCaption, notify, scheduleDate, scheduleRepeatPeriod, replyToTopMsg, payStars, monoForumPeerId, suggestionParams);
+                                });
+                                return;
                             } else {
                                 AndroidUtilities.runOnUIThread(() -> AlertsCreator.processError(currentAccount, error, null, req));
                             }
@@ -2802,6 +2818,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                         arr = new ArrayList<>();
                         randomIds = new ArrayList<>();
                         ids = new ArrayList<>();
+                        sourceObjs = new ArrayList<>();
                         messagesByRandomIds = new LongSparseArray<>();
                     }
                 }

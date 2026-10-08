@@ -383,4 +383,6 @@
     <string name="SwitchStyleTelegram">Telegram</string>
     <string name="SwitchStyleModern">现代</string>
     <string name="DisableChatListSwipeGesture">禁用主页聊天列表滑动手势</string>
+    <string name="NoQuoteForwardCopyFallback">转发失败（%1$s），已改为直接复制发送</string>
+    <string name="NoQuoteForwardCopySkipped">%1$d 条消息无法复制，已跳过</string>
 </resources>

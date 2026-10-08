@@ -384,4 +384,6 @@
     <string name="SwitchStyleTelegram">Telegram</string>
     <string name="SwitchStyleModern">Modern</string>
     <string name="DisableChatListSwipeGesture">Disable chat list swipe gesture</string>
+    <string name="NoQuoteForwardCopyFallback">Forwarding failed (%1$s), sending a copy instead</string>
+    <string name="NoQuoteForwardCopySkipped">%1$d message(s) can\'t be copied and were skipped</string>
 </resources>
