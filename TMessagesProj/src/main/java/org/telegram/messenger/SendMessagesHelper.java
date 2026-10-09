@@ -2765,16 +2765,17 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                     getMessagesController().processUpdates(updates, false);
                                 }
                                 getStatsController().incrementSentItemsCount(ApplicationLoader.getCurrentNetworkType(), StatsController.TYPE_MESSAGES, sentCount);
-                            } else if (forwardFromMyName && NoQuoteForwardHelper.canFallbackToCopy(error)) {
-                                // NoQuote forward failed (e.g. CHAT_FORWARDS_RESTRICTED): don't rely on the server
-                                // forward flag, drop the local placeholders and copy files / formatted text instead
+                            } else if (NoQuoteForwardHelper.shouldOfferCopy(currentAccount, error, forwardFromMyName, peer)) {
+                                // NoQuote forward / save to Saved Messages failed (e.g. CHAT_FORWARDS_RESTRICTED):
+                                // drop the local placeholders (memory, sending queue and database) so no failed
+                                // messages are left behind, then offer to copy files / formatted text instead
                                 AndroidUtilities.runOnUIThread(() -> {
                                     cancelSendingMessage(newMsgArr);
                                     for (int a1 = 0; a1 < newMsgArr.size(); a1++) {
                                         processSentMessage(newMsgArr.get(a1).getId());
+                                        removeFromSendingMessages(newMsgArr.get(a1).getId(), scheduleDate != 0);
                                     }
-                                    NoQuoteForwardHelper.showFallbackToast(error);
-                                    NoQuoteForwardHelper.getInstance(currentAccount).copyMessages(sourceMsgArr, peer, hideCaption, notify, scheduleDate, scheduleRepeatPeriod, replyToTopMsg, payStars, monoForumPeerId, suggestionParams);
+                                    NoQuoteForwardHelper.getInstance(currentAccount).offerCopy(error, req, sourceMsgArr, peer, hideCaption, notify, scheduleDate, scheduleRepeatPeriod, replyToTopMsg, payStars, monoForumPeerId, suggestionParams);
                                 });
                                 return;
                             } else {

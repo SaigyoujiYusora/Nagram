@@ -9396,6 +9396,23 @@ public class MessagesStorage extends BaseController {
                         }
 
                         if (containMessage) {
+                            // Local (unsent / failed, negative mid) messages are matched by "m.mid < 0" regardless of their
+                            // position. Bound them by the anchor message date, otherwise e.g. a batch of failed forwards
+                            // newer than the jump target fills the "older" half of the result, the anchor message is
+                            // pushed out of it and jumping to a date / message ends up resetting the chat to the bottom.
+                            int anchorDate = Integer.MAX_VALUE;
+                            if (messageMaxId > 0) {
+                                if (threadMessageId != 0) {
+                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT date FROM messages_topics WHERE uid = %d AND topic_id = %d AND mid = %d", dialogId, threadMessageId, messageMaxId));
+                                } else {
+                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT date FROM messages_v2 WHERE uid = %d AND mid = %d", dialogId, messageMaxId));
+                                }
+                                if (cursor.next()) {
+                                    anchorDate = cursor.intValue(0);
+                                }
+                                cursor.dispose();
+                                cursor = null;
+                            }
                             int holeMessageMaxId = 0;
                             int holeMessageMinId = 1;
                             if (threadMessageId != 0) {
@@ -9423,19 +9440,19 @@ public class MessagesStorage extends BaseController {
                                     holeMessageMaxId = 1000000000;
                                 }
                                 if (threadMessageId != 0) {
-                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.topic_id = %d AND m.mid <= %d AND (m.mid >= %d OR m.mid < 0) ORDER BY m.date DESC, m.mid DESC LIMIT %d) UNION " +
-                                            "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.topic_id = %d AND m.mid > %d AND (m.mid <= %d OR m.mid < 0) ORDER BY m.date ASC, m.mid ASC LIMIT %d)", dialogId, threadMessageId, messageMaxId, holeMessageMinId, count_query / 2, dialogId, threadMessageId, messageMaxId, holeMessageMaxId, count_query / 2));
+                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.topic_id = %d AND m.mid <= %d AND (m.mid >= %d OR m.mid < 0 AND m.date <= %d) ORDER BY m.date DESC, m.mid DESC LIMIT %d) UNION " +
+                                            "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.topic_id = %d AND (m.mid > %d AND m.mid <= %d OR m.mid < 0 AND m.date > %d) ORDER BY m.date ASC, m.mid ASC LIMIT %d)", dialogId, threadMessageId, messageMaxId, holeMessageMinId, anchorDate, count_query / 2, dialogId, threadMessageId, messageMaxId, holeMessageMaxId, anchorDate, count_query / 2));
                                 } else {
-                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.mid <= %d AND (m.mid >= %d OR m.mid < 0) ORDER BY m.date DESC, m.mid DESC LIMIT %d) UNION " +
-                                            "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.mid > %d AND (m.mid <= %d OR m.mid < 0) ORDER BY m.date ASC, m.mid ASC LIMIT %d)", dialogId, messageMaxId, holeMessageMinId, count_query / 2, dialogId, messageMaxId, holeMessageMaxId, count_query / 2));
+                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.mid <= %d AND (m.mid >= %d OR m.mid < 0 AND m.date <= %d) ORDER BY m.date DESC, m.mid DESC LIMIT %d) UNION " +
+                                            "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND (m.mid > %d AND m.mid <= %d OR m.mid < 0 AND m.date > %d) ORDER BY m.date ASC, m.mid ASC LIMIT %d)", dialogId, messageMaxId, holeMessageMinId, anchorDate, count_query / 2, dialogId, messageMaxId, holeMessageMaxId, anchorDate, count_query / 2));
                                 }
                             } else {
                                 if (threadMessageId != 0) {
-                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.topic_id = %d AND m.mid <= %d ORDER BY m.date DESC, m.mid DESC LIMIT %d) UNION " +
-                                            "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.topic_id = %d AND m.mid > %d ORDER BY m.date ASC, m.mid ASC LIMIT %d)", dialogId, threadMessageId, messageMaxId, count_query / 2, dialogId, threadMessageId, messageMaxId, count_query / 2));
+                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.topic_id = %d AND m.mid <= %d AND (m.mid > 0 OR m.date <= %d) ORDER BY m.date DESC, m.mid DESC LIMIT %d) UNION " +
+                                            "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.topic_id = %d AND (m.mid > %d OR m.mid < 0 AND m.date > %d) ORDER BY m.date ASC, m.mid ASC LIMIT %d)", dialogId, threadMessageId, messageMaxId, anchorDate, count_query / 2, dialogId, threadMessageId, messageMaxId, anchorDate, count_query / 2));
                                 } else {
-                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.mid <= %d ORDER BY m.date DESC, m.mid DESC LIMIT %d) UNION " +
-                                            "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.mid > %d ORDER BY m.date ASC, m.mid ASC LIMIT %d)", dialogId, messageMaxId, count_query / 2, dialogId, messageMaxId, count_query / 2));
+                                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND m.mid <= %d AND (m.mid > 0 OR m.date <= %d) ORDER BY m.date DESC, m.mid DESC LIMIT %d) UNION " +
+                                            "SELECT * FROM (" + messageSelect + " WHERE m.uid = %d AND (m.mid > %d OR m.mid < 0 AND m.date > %d) ORDER BY m.date ASC, m.mid ASC LIMIT %d)", dialogId, messageMaxId, anchorDate, count_query / 2, dialogId, messageMaxId, anchorDate, count_query / 2));
                                 }
                             }
                         } else {

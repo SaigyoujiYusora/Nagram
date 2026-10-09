@@ -1406,6 +1406,12 @@ object NaConfig {
             ConfigItem.configTypeBool,
             false
         )
+    val noQuoteCopyFallback =
+        addConfig(
+            "NoQuoteCopyFallback",
+            ConfigItem.configTypeBool,
+            true
+        )
 
     private fun addConfig(
         k: String,

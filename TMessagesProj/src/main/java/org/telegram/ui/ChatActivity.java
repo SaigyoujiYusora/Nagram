@@ -395,6 +395,7 @@ import tw.nekomimi.nekogram.utils.EnvUtil;
 import tw.nekomimi.nekogram.utils.PGPUtil;
 import tw.nekomimi.nekogram.utils.ProxyUtil;
 import tw.nekomimi.nekogram.utils.TelegramUtil;
+import tw.nekomimi.nekogram.helpers.NoQuoteForwardHelper;
 import xyz.nextalone.nagram.NaConfig;
 import xyz.nextalone.nagram.helper.DoubleTap;
 import xyz.nextalone.nagram.helper.MessageHelper;
@@ -12880,7 +12881,7 @@ public class ChatActivity extends BaseFragment implements
     }
 
     private void openForward(boolean fromActionBar) {
-        if (isPeerNoForwards() || hasSelectedNoforwardsMessage()) {
+        if (!(noForwardQuote && NoQuoteForwardHelper.isProtectedNoQuoteEnabled()) && (isPeerNoForwards() || hasSelectedNoforwardsMessage())) {
             // We should update text if user changed locale without re-opening chat activity
             String str;
             if (isPeerNoForwards()) {
@@ -13084,7 +13085,8 @@ public class ChatActivity extends BaseFragment implements
         if (firstMessage.messageOwner.date >= date && lastMessage.messageOwner.date <= date || lastMessage.messageOwner.date >= date && endReached[0]) {
             for (int a = messages.size() - 1; a >= 0; a--) {
                 MessageObject message = messages.get(a);
-                if (message.messageOwner.date >= date && message.getId() != 0) {
+                // skip local (unsent / failed, negative id) messages: they can't be loaded around by id
+                if (message.messageOwner.date >= date && message.getId() > 0) {
                     scrollToMessageId(message.getId(), 0, false, message.getDialogId() == mergeDialogId ? 1 : 0, true, 0);
                     break;
                 }
@@ -19975,11 +19977,13 @@ public class ChatActivity extends BaseFragment implements
                 boolean canForward = chatMode != MODE_SCHEDULED && cantForwardMessagesCount == 0 && !noforwards;
                 boolean showForward = !NaConfig.INSTANCE.getDisableActionBarButtonForward().Bool();
 
+                // with the copy fallback + Force Copy, protected content can still be no-quote forwarded / saved (as a copy)
+                boolean canCopyForward = canForward || chatMode != MODE_SCHEDULED && cantForwardMessagesCount == 0 && NoQuoteForwardHelper.isProtectedNoQuoteEnabled();
                 if (forwardNoQuoteItem != null) {
-                    forwardNoQuoteItem.setVisibility(canForward && NaConfig.INSTANCE.getShowNoQuoteForward().Bool());
+                    forwardNoQuoteItem.setVisibility(canCopyForward && NaConfig.INSTANCE.getShowNoQuoteForward().Bool());
                 }
                 if (saveMessageItem != null) {
-                    saveMessageItem.setVisibility(canForward);
+                    saveMessageItem.setVisibility(canCopyForward);
                 }
 
                 createBottomMessagesActionButtons();
@@ -48504,7 +48508,7 @@ public class ChatActivity extends BaseFragment implements
                     icons.add(R.drawable.msg_forward);
                 }
                 if (chatMode != MODE_SCHEDULED && !selectedObject.needDrawBluredPreview() && !selectedObject.isLiveLocation() && selectedObject.type != 16) {
-                    if (!noforward && NaConfig.INSTANCE.getShowNoQuoteForward().Bool()) {
+                    if ((!noforward || NoQuoteForwardHelper.isProtectedNoQuoteEnabled()) && NaConfig.INSTANCE.getShowNoQuoteForward().Bool()) {
                         items.add(LocaleController.getString(R.string.NoQuoteForward));
                         options.add(nkbtn_forward_noquote);
                         icons.add(R.drawable.msg_forward_noquote);

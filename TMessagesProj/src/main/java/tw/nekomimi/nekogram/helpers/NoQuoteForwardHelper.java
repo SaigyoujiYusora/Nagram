@@ -25,7 +25,14 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import org.telegram.messenger.UserConfig;
+import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.Components.AlertsCreator;
+import org.telegram.ui.LaunchActivity;
+
 import tw.nekomimi.nekogram.utils.AlertUtil;
+import xyz.nextalone.nagram.NaConfig;
 
 /**
  * Fallback for "no quote forward" (forward with drop_author).
@@ -103,6 +110,55 @@ public class NoQuoteForwardHelper extends BaseController implements Notification
                 || text.equals("PEER_ID_INVALID")
                 || text.equals("SCHEDULE_TOO_MUCH")
                 || text.equals("SCHEDULE_DATE_TOO_LATE"));
+    }
+
+    /** Master switch (Nagram settings - Experimental). */
+    public static boolean isEnabled() {
+        return NaConfig.INSTANCE.getNoQuoteCopyFallback().Bool();
+    }
+
+    /** Whether no-quote forward / save should be exposed in protected chats (needs Force Copy too). */
+    public static boolean isProtectedNoQuoteEnabled() {
+        return isEnabled() && NaConfig.INSTANCE.getForceCopy().Bool();
+    }
+
+    public static boolean isForwardsRestrictedError(TLRPC.TL_error error) {
+        return error != null && error.text != null && (error.text.contains("FORWARDS_RESTRICTED") || error.text.contains("NOFORWARDS") || error.text.contains("PROTECTED"));
+    }
+
+    /**
+     * Whether a failed messages.forwardMessages should be offered the copy fallback:
+     * any copyable error for no-quote forwards, or a protected-content error when saving to Saved Messages.
+     */
+    public static boolean shouldOfferCopy(int account, TLRPC.TL_error error, boolean forwardFromMyName, long peer) {
+        if (!isEnabled() || !canFallbackToCopy(error)) {
+            return false;
+        }
+        if (forwardFromMyName) {
+            return true;
+        }
+        return peer == UserConfig.getInstance(account).getClientUserId() && isForwardsRestrictedError(error);
+    }
+
+    /**
+     * Ask the user whether to copy instead, then copy on confirm. Must be called on the UI thread.
+     */
+    public void offerCopy(TLRPC.TL_error error, TLObject req, ArrayList<MessageObject> messages, long peer, boolean hideCaption, boolean notify, int scheduleDate, int scheduleRepeatPeriod, MessageObject replyToTopMsg, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        BaseFragment fragment = LaunchActivity.getSafeLastFragment();
+        if (fragment == null || fragment.getParentActivity() == null) {
+            AlertsCreator.processError(currentAccount, error, null, req);
+            return;
+        }
+        int count = messages == null ? 0 : messages.size();
+        AlertDialog.Builder builder = new AlertDialog.Builder(fragment.getParentActivity(), fragment.getResourceProvider());
+        builder.setTitle(LocaleController.getString(R.string.NoQuoteCopyConfirmTitle));
+        builder.setMessage(LocaleController.formatString(R.string.NoQuoteCopyConfirmText, count, error != null && error.text != null ? error.text : ""));
+        builder.setPositiveButton(LocaleController.getString(R.string.NoQuoteCopyConfirmButton), (dialog, which) -> {
+            showFallbackToast(error);
+            copyMessages(messages, peer, hideCaption, notify, scheduleDate, scheduleRepeatPeriod, replyToTopMsg, payStars, monoForumPeerId, suggestionParams);
+        });
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        fragment.showDialog(builder.create());
     }
 
     public static void showFallbackToast(TLRPC.TL_error error) {
@@ -342,26 +398,67 @@ public class NoQuoteForwardHelper extends BaseController implements Notification
         return file != null && file.exists() && file.length() > 0;
     }
 
+    private File checkAttach(TLObject target) {
+        File file = getFileLoader().getPathToAttach(target, null, false, false);
+        if (isUsableFile(file)) {
+            return file;
+        }
+        file = getFileLoader().getPathToAttach(target, null, true, false);
+        return isUsableFile(file) ? file : null;
+    }
+
+    /**
+     * Look for an already downloaded / cached copy of the media so it can be uploaded without
+     * downloading again: the attach path, any (reasonably large) cached photo size, the document
+     * in the media / documents folders or cache, and saved downloads known to the file database.
+     */
     private File findLocalFile(MessageObject messageObject) {
-        String attachPath = messageObject.messageOwner.attachPath;
+        TLRPC.Message owner = messageObject.messageOwner;
+        String attachPath = owner.attachPath;
         if (!TextUtils.isEmpty(attachPath)) {
             File file = new File(attachPath);
             if (isUsableFile(file)) {
                 return file;
             }
         }
-        TLObject target = getDownloadTarget(messageObject);
-        if (target != null) {
-            File file = getFileLoader().getPathToAttach(target, false);
-            if (isUsableFile(file)) {
-                return file;
+        TLRPC.MessageMedia media = owner.media;
+        if (media instanceof TLRPC.TL_messageMediaPhoto && media.photo != null && media.photo.sizes != null) {
+            TLObject wanted = getDownloadTarget(messageObject);
+            if (wanted != null) {
+                File file = checkAttach(wanted);
+                if (file != null) {
+                    return file;
+                }
             }
-            file = getFileLoader().getPathToAttach(target, true);
-            if (isUsableFile(file)) {
-                return file;
+            ArrayList<TLRPC.PhotoSize> sizes = new ArrayList<>(media.photo.sizes);
+            java.util.Collections.sort(sizes, (a, b) -> Long.compare((long) b.w * b.h, (long) a.w * a.h));
+            for (int a = 0; a < sizes.size(); a++) {
+                TLRPC.PhotoSize size = sizes.get(a);
+                if (size == null || size instanceof TLRPC.TL_photoStrippedSize || size instanceof TLRPC.TL_photoPathSize || size instanceof TLRPC.TL_photoCachedSize) {
+                    continue;
+                }
+                if (Math.max(size.w, size.h) < 320) {
+                    break;
+                }
+                File file = checkAttach(size);
+                if (file != null) {
+                    return file;
+                }
+            }
+        } else {
+            TLObject target = getDownloadTarget(messageObject);
+            if (target != null) {
+                File file = checkAttach(target);
+                if (file != null) {
+                    return file;
+                }
             }
         }
-        File file = getFileLoader().getPathToMessage(messageObject.messageOwner);
+        File file = getFileLoader().getPathToMessage(owner, false, false);
+        if (isUsableFile(file)) {
+            return file;
+        }
+        file = getFileLoader().getPathToMessage(owner, true, false);
         if (isUsableFile(file)) {
             return file;
         }

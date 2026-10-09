@@ -386,4 +386,9 @@
     <string name="DisableChatListSwipeGesture">Disable chat list swipe gesture</string>
     <string name="NoQuoteForwardCopyFallback">Forwarding failed (%1$s), sending a copy instead</string>
     <string name="NoQuoteForwardCopySkipped">%1$d message(s) can\'t be copied and were skipped</string>
+    <string name="NoQuoteCopyFallback">Copy content when forwarding fails</string>
+    <string name="NoQuoteCopyFallbackDesc">When a no-quote forward or saving to Saved Messages fails (e.g. protected content), offer to re-send a copy (re-uploading media, cached files first). With Force Copy enabled, also shows No-Quote Forward in protected chats.</string>
+    <string name="NoQuoteCopyConfirmTitle">Send a copy instead?</string>
+    <string name="NoQuoteCopyConfirmText">Forwarding %1$d message(s) failed (%2$s). Copy the content and re-upload the media instead? Cached files are uploaded directly, others are downloaded first.</string>
+    <string name="NoQuoteCopyConfirmButton">Copy</string>
 </resources>

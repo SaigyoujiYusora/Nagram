@@ -385,4 +385,9 @@
     <string name="DisableChatListSwipeGesture">禁用主页聊天列表滑动手势</string>
     <string name="NoQuoteForwardCopyFallback">转发失败（%1$s），已改为直接复制发送</string>
     <string name="NoQuoteForwardCopySkipped">%1$d 条消息无法复制，已跳过</string>
+    <string name="NoQuoteCopyFallback">转发失败时复制内容</string>
+    <string name="NoQuoteCopyFallbackDesc">无引用转发或保存到收藏夹失败（如受保护的内容）时，询问是否改为复制发送（重新上传媒体，优先使用已缓存的文件）。开启“强制允许复制”时，受保护的聊天中也会显示“无引用转发”。</string>
+    <string name="NoQuoteCopyConfirmTitle">改为复制发送？</string>
+    <string name="NoQuoteCopyConfirmText">%1$d 条消息转发失败（%2$s）。是否改为复制内容并重新上传媒体？已缓存的文件会直接上传，其余文件会先下载。</string>
+    <string name="NoQuoteCopyConfirmButton">复制</string>
 </resources>
