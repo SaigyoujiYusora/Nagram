@@ -1686,21 +1686,24 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         if (GroupCallPip.onBackPressed()) {
             return;
         }
-        // A fragment shown as a preview (chat peek / quick view) sits on top of everything else here:
-        // Back must close it first and must not reach the preview's own search / list state or the
-        // fragment behind it (e.g. a hashtag search that would otherwise be stepped back / cancelled).
-        if (inPreviewMode && fragmentsStack.size() > 1 && fragmentsStack.get(fragmentsStack.size() - 1).inPreviewMode) {
-            finishPreviewFragment();
+        // Sheets attached to the layout or to the top fragment (Instant View / ArticleViewer.Sheet, web apps,
+        // story viewer, ...) are drawn above the fragment and its action bar, so they must get Back first.
+        // Otherwise an open search field of the fragment below (e.g. the chat's hashtag search) is closed /
+        // stepped back while the Instant View stays open.
+        if (sheetFragment != null && !sheetFragment.onBackPressed(true)) {
+            return;
+        }
+        BaseFragment lastFragment = fragmentsStack.get(fragmentsStack.size() - 1);
+        if (lastFragment.hasShownSheet()) {
+            if (lastFragment.onBackPressed(true)) {
+                closeLastFragment(true);
+            }
             return;
         }
         if (!storyViewerAttached() && currentActionBar != null && !currentActionBar.isActionModeShowed() && currentActionBar.isSearchFieldVisible) {
             currentActionBar.closeSearchField();
             return;
         }
-        if (sheetFragment != null && !sheetFragment.onBackPressed(true)) {
-            return;
-        }
-        BaseFragment lastFragment = fragmentsStack.get(fragmentsStack.size() - 1);
         if (lastFragment.onBackPressed(true)) {
             if (!fragmentsStack.isEmpty()) {
                 closeLastFragment(true);
