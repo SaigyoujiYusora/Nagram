@@ -1686,6 +1686,13 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         if (GroupCallPip.onBackPressed()) {
             return;
         }
+        // A fragment shown as a preview (chat peek / quick view) sits on top of everything else here:
+        // Back must close it first and must not reach the preview's own search / list state or the
+        // fragment behind it (e.g. a hashtag search that would otherwise be stepped back / cancelled).
+        if (inPreviewMode && fragmentsStack.size() > 1 && fragmentsStack.get(fragmentsStack.size() - 1).inPreviewMode) {
+            finishPreviewFragment();
+            return;
+        }
         if (!storyViewerAttached() && currentActionBar != null && !currentActionBar.isActionModeShowed() && currentActionBar.isSearchFieldVisible) {
             currentActionBar.closeSearchField();
             return;

@@ -4465,6 +4465,19 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                         totalImagesCount = imagesArr.size();
                         totalImagesCountMerge = 0;
                     }
+                    // The viewer may already show nearby photos taken from the chat (see seedImagesFromChat) and the
+                    // user may have swiped to one loaded in an earlier page, so look the shown message up in
+                    // everything loaded so far, and keep the displayed instance to switch without reloading it.
+                    foundIndex = -1;
+                    for (int a = 0; a < imagesArrTemp.size(); a++) {
+                        MessageObject message = imagesArrTemp.get(a);
+                        if (message.getId() == currentMessage.getId() && message.getDialogId() == currentMessage.getDialogId()) {
+                            foundIndex = a;
+                            imagesArrTemp.set(a, currentMessage);
+                            imagesByIdsTemp[message.getDialogId() == mergeDialogId && mergeDialogId != 0 ? 1 : 0].put(currentMessage.getId(), currentMessage);
+                            break;
+                        }
+                    }
 
                     if (foundIndex != -1) {
                         imagesArr.clear();
@@ -14753,6 +14766,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                     }
                     isFirstLoading = false;
                 } else if (MediaDataController.getMediaType(currentMessageObject.messageOwner) == sharedMediaType && (placeProvider == null || !placeProvider.forceAllInGroup())) {
+                    seedImagesFromChat();
                     MediaDataController.getInstance(currentAccount).getMediaCount(currentDialogId, topicId, sharedMediaType, classGuid, true);
                     if (mergeDialogId != 0) {
                         MediaDataController.getInstance(currentAccount).getMediaCount(mergeDialogId, topicId, sharedMediaType, classGuid, true);
@@ -14806,6 +14820,82 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     private void setDoubleTapEnabled(boolean value) {
         doubleTapEnabled = value;
         gestureDetector.setOnDoubleTapListener(value ? this : null);
+    }
+
+    private static final int SEED_IMAGES_PER_SIDE = 30;
+
+    /**
+     * Opening a photo from a chat used to show only that photo until the shared media count and the
+     * page containing it were loaded from the server (needSearchImageInArr), so swiping was blocked.
+     * Fill the viewer right away with the same-type media already loaded in the chat around the tapped
+     * message; the background search keeps running and replaces the list (keeping the shown photo)
+     * once the full index is known.
+     */
+    private void seedImagesFromChat() {
+        if (!needSearchImageInArr || opennedFromMedia || parentChatActivity == null || currentMessageObject == null || currentFiltered
+                || imagesArr.size() != 1 || !imagesArrLocals.isEmpty() || parentChatActivity.messages == null) {
+            return;
+        }
+        int chatMode = parentChatActivity.getChatMode();
+        if (chatMode == ChatActivity.MODE_SCHEDULED || chatMode == ChatActivity.MODE_QUICK_REPLIES || chatMode == ChatActivity.MODE_PINNED) {
+            return;
+        }
+        final MessageObject current = imagesArr.get(0);
+        final ArrayList<MessageObject> source = parentChatActivity.messages;
+        int center = -1;
+        for (int a = 0; a < source.size(); a++) {
+            MessageObject message = source.get(a);
+            if (message != null && message.getId() == current.getId() && message.getDialogId() == current.getDialogId()) {
+                center = a;
+                break;
+            }
+        }
+        if (center < 0) {
+            return;
+        }
+        // chat messages are newest first; the viewer list is oldest first
+        ArrayList<MessageObject> older = new ArrayList<>();
+        for (int a = center + 1; a < source.size() && older.size() < SEED_IMAGES_PER_SIDE; a++) {
+            MessageObject message = source.get(a);
+            if (isSeedable(message)) {
+                older.add(0, message);
+            }
+        }
+        ArrayList<MessageObject> newer = new ArrayList<>();
+        for (int a = center - 1; a >= 0 && newer.size() < SEED_IMAGES_PER_SIDE; a--) {
+            MessageObject message = source.get(a);
+            if (isSeedable(message)) {
+                newer.add(message);
+            }
+        }
+        if (older.isEmpty() && newer.isEmpty()) {
+            return;
+        }
+        imagesArr.clear();
+        imagesArr.addAll(older);
+        int index = imagesArr.size();
+        imagesArr.add(current);
+        imagesArr.addAll(newer);
+        for (int a = 0; a < imagesArr.size(); a++) {
+            MessageObject message = imagesArr.get(a);
+            imagesByIds[mergeDialogId != 0 && message.getDialogId() == mergeDialogId ? 1 : 0].put(message.getId(), message);
+        }
+        currentIndex = -1;
+        setImageIndex(index);
+    }
+
+    private boolean isSeedable(MessageObject message) {
+        if (message == null || message.messageOwner == null || message.getId() <= 0 || message.isHiddenSensitive() || message.isSponsored()
+                || message.needDrawBluredPreview() || message.hasExtendedMediaPreview() || message.scheduled) {
+            return false;
+        }
+        if (message.getDialogId() != currentDialogId && (mergeDialogId == 0 || message.getDialogId() != mergeDialogId)) {
+            return false;
+        }
+        if (message.messageOwner.action != null && !(message.messageOwner.action instanceof TLRPC.TL_messageActionEmpty)) {
+            return false;
+        }
+        return MediaDataController.getMediaType(message.messageOwner) == sharedMediaType;
     }
 
     private void setImages() {
