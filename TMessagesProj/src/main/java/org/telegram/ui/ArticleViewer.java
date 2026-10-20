@@ -12625,10 +12625,6 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
 
             setWillNotDraw(false);
             imageView = new ImageReceiver(this);
-            // Only start HTTP/FileLoader work once the cell is attached (on screen / nearby).
-            // Stock BackupImageView does this; without it, measure/bind of off-screen holders
-            // can queue downloads for every photo on a long Telegraph page.
-            imageView.setAllowLoadingOnAttachedOnly(true);
             channelCell = new BlockChannelCell(context, parent, adapter, 1);
             radialProgress = new RadialProgress2(this);
             radialProgress.setProgressColor(0xffffffff);
@@ -12812,26 +12808,28 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
 
                     autoDownload = (DownloadController.getInstance(parent.getCurrentAccount()).getCurrentDownloadMask() & DownloadController.AUTODOWNLOAD_TYPE_PHOTO) != 0;
                     if (calcHeight) {
-
-                    } else if (currentPhoto instanceof WebInstantView.WebPhoto && ((WebInstantView.WebPhoto) currentPhoto).instantView != null && ((WebInstantView.WebPhoto) currentPhoto).instantView.useImageLoader) {
-                        autoDownload = true;
-                        imageView.setStrippedLocation(null);
-                        final WebInstantView.WebPhoto webPhoto = (WebInstantView.WebPhoto) currentPhoto;
-                        // Downsample to the on-screen cell size (still one HTTP GET of the original
-                        // file — telegra.ph has no size variants — but only for attached cells).
-                        final int fw = Math.max(1, (int) (photoWidth / AndroidUtilities.density));
-                        final int fh = Math.max(1, (int) (photoHeight / AndroidUtilities.density));
-                        final String webFilter = String.format(Locale.US, "%d_%d", fw, fh);
-                        // Intentionally no requestLayout on load: changing cell height after bind
-                        // pulls more placeholders into the viewport and queues every image on the page.
-                        imageView.setDelegate(null);
-                        imageView.setImage(ImageLocation.getForPath(webPhoto.url), webFilter, null, null, null, 0, null, adapter != null ? adapter.currentPage : parentObject, 1);
+                        // Height-only measure (content-height pass): never start downloads.
+                        imageView.clearImage();
                     } else if (currentPhoto instanceof WebInstantView.WebPhoto) {
                         autoDownload = true;
                         imageView.setStrippedLocation(null);
-                        WebInstantView.loadPhoto((WebInstantView.WebPhoto) currentPhoto, imageView, () -> {
-                            requestLayout();
-                        });
+                        final WebInstantView.WebPhoto webPhoto = (WebInstantView.WebPhoto) currentPhoto;
+                        // Intentionally no requestLayout when size becomes known: fixed 3:4
+                        // placeholders keep layout stable so RecyclerView only binds the viewport
+                        // (+prefetch), matching stock IV lazy loading without cascading all images.
+                        imageView.setDelegate(null);
+                        if (webPhoto.instantView != null && webPhoto.instantView.useImageLoader) {
+                            final int fw = Math.max(1, (int) (photoWidth / AndroidUtilities.density));
+                            final int fh = Math.max(1, (int) (photoHeight / AndroidUtilities.density));
+                            final String webFilter = String.format(Locale.US, "%d_%d", fw, fh);
+                            // parentObject null: path HTTP loads must not depend on WebPage FileLoader semantics
+                            imageView.setImage(ImageLocation.getForPath(webPhoto.url), webFilter, null, null, null, 0, null, null, 1);
+                        } else if (webPhoto.instantView != null) {
+                            WebInstantView.loadPhoto(webPhoto, imageView, null);
+                        } else {
+                            // instantView missing: still try plain HTTP via ImageLoader
+                            imageView.setImage(ImageLocation.getForPath(webPhoto.url), null, null, null, null, 0, null, null, 1);
+                        }
                     } else {
                         final File path = FileLoader.getInstance(parent.getCurrentAccount()).getPathToAttach(currentPhotoObject, true);
                         if (autoDownload || path.exists()) {
@@ -13001,6 +12999,11 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
             updateButtonState(false);
             if (captionLayout != null) captionLayout.attach(this);
             if (creditLayout != null) creditLayout.attach(this);
+            // Ensure WebPhoto HTTP bind runs after ImageReceiver is attached (RecyclerView may
+            // have measured us while detached / with allowLoading backup semantics).
+            if (currentBlock != null && currentPhoto instanceof WebInstantView.WebPhoto) {
+                requestLayout();
+            }
         }
 
         @Override
