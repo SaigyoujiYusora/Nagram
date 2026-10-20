@@ -1412,6 +1412,12 @@ object NaConfig {
             ConfigItem.configTypeBool,
             true
         )
+    val forceTelegraphInstantView =
+        addConfig(
+            "ForceTelegraphInstantView",
+            ConfigItem.configTypeBool,
+            true
+        )
 
     private fun addConfig(
         k: String,

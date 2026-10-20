@@ -216,6 +216,7 @@ import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_iv;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.web.WebInstantView;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarMenuSlider;
@@ -17245,7 +17246,14 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             int[] size = new int[1];
             TLObject media = pageBlocksAdapter.getMedia(index);
             TLRPC.PhotoSize fileLocation = pageBlocksAdapter.getFileLocation(media, size);
-            if (fileLocation != null) {
+            if (media instanceof WebInstantView.WebPhoto && !TextUtils.isEmpty(((WebInstantView.WebPhoto) media).url)) {
+                // Nagram: photos of generated (web / forced Telegraph) Instant View pages are plain http urls
+                ImageReceiver.BitmapHolder placeHolder = null;
+                if (currentThumb != null && imageReceiver == centerImage) {
+                    placeHolder = currentThumb;
+                }
+                imageReceiver.setImage(ImageLocation.getForPath(((WebInstantView.WebPhoto) media).url), null, null, null, placeHolder != null ? new BitmapDrawable(placeHolder.bitmap) : null, 0, null, pageBlocksAdapter.getParentObject(), 1);
+            } else if (fileLocation != null) {
                 if (media instanceof TLRPC.Photo) {
                     TLRPC.Photo photo = (TLRPC.Photo) media;
                     ImageReceiver.BitmapHolder placeHolder = null;

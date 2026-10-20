@@ -12759,6 +12759,10 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
                         WebInstantView.WebPhoto webphoto = (WebInstantView.WebPhoto) currentPhoto;
                         w = webphoto.w;
                         h = webphoto.h;
+                        if ((w <= 0 || h <= 0) && webphoto.instantView != null && webphoto.instantView.useImageLoader) {
+                            // size unknown until the image is loaded: reserve a square placeholder
+                            w = h = 1;
+                        }
                     } else {
                         w = currentPhotoObject.w;
                         h = currentPhotoObject.h;
@@ -12803,6 +12807,22 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
                     autoDownload = (DownloadController.getInstance(parent.getCurrentAccount()).getCurrentDownloadMask() & DownloadController.AUTODOWNLOAD_TYPE_PHOTO) != 0;
                     if (calcHeight) {
 
+                    } else if (currentPhoto instanceof WebInstantView.WebPhoto && ((WebInstantView.WebPhoto) currentPhoto).instantView != null && ((WebInstantView.WebPhoto) currentPhoto).instantView.useImageLoader) {
+                        autoDownload = true;
+                        imageView.setStrippedLocation(null);
+                        final WebInstantView.WebPhoto webPhoto = (WebInstantView.WebPhoto) currentPhoto;
+                        final int filterSide = (int) (Math.min(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y) / AndroidUtilities.density);
+                        final String webFilter = String.format(Locale.US, "%d_%d", filterSide, filterSide);
+                        imageView.setDelegate((receiver, set, thumb, memCache) -> {
+                            if (!set || thumb || currentPhoto != webPhoto || webPhoto.w > 0 && webPhoto.h > 0) return;
+                            final int bw = receiver.getBitmapWidth(), bh = receiver.getBitmapHeight();
+                            if (bw > 0 && bh > 0) {
+                                webPhoto.w = bw;
+                                webPhoto.h = bh;
+                                AndroidUtilities.runOnUIThread(this::requestLayout);
+                            }
+                        });
+                        imageView.setImage(ImageLocation.getForPath(webPhoto.url), webFilter, null, null, null, 0, null, adapter != null ? adapter.currentPage : parentObject, 1);
                     } else if (currentPhoto instanceof WebInstantView.WebPhoto) {
                         autoDownload = true;
                         imageView.setStrippedLocation(null);
@@ -12934,6 +12954,10 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
             final File path2 = FileLoader.getInstance(currentAccount).getPathToAttach(currentPhotoObject, false);
             boolean fileExists = path.exists() || path2 != null && path2.exists();
             if (TextUtils.isEmpty(fileName)) {
+                if (currentBlock != null && WebPageUtils.getPhotoWithId(currentPage, currentBlock.photo_id) instanceof WebInstantView.WebPhoto) {
+                    // nothing to download through FileLoader: a tap opens the photo viewer
+                    buttonState = -1;
+                }
                 radialProgress.setIcon(MediaActionDrawable.ICON_NONE, false, false);
                 return;
             }

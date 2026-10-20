@@ -66,6 +66,8 @@ public class WebInstantView {
     public String url;
     public MHTML mhtml;
     public TLRPC.WebPage webpage;
+    /** Nagram: load photos through ImageLoader (disk cache + downsampling) instead of raw bitmaps, used by forced Telegraph Instant View. */
+    public boolean useImageLoader;
 
     public final HashMap<String, Bitmap> loadedPhotos = new HashMap<>();
     public static final HashMap<TLRPC.WebPage, WebInstantView> instants = new HashMap<>();

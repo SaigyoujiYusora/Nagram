@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import tw.nekomimi.nekogram.helpers.TelegraphInstantView;
 import xyz.nextalone.nagram.NaConfig;
 
 public class Browser {
@@ -321,19 +322,24 @@ public class Browser {
                     };
 
                     Uri finalUri = uri;
+                    final Runnable[] forcedIvCancel = new Runnable[1];
                     TL_account.getWebPagePreview req = new TL_account.getWebPagePreview();
                     req.message = uri.toString();
                     final int reqId = ConnectionsManager.getInstance(UserConfig.selectedAccount).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
-                        if (inCaseLoading != null) {
-                            inCaseLoading.end();
-                        } else {
-                            try {
-                                progressDialog[0].dismiss();
-                            } catch (Throwable ignore) {}
-                            progressDialog[0] = null;
-                        }
+                        final Runnable endLoading = () -> {
+                            if (inCaseLoading != null) {
+                                inCaseLoading.end();
+                            } else {
+                                try {
+                                    if (progressDialog[0] != null) {
+                                        progressDialog[0].dismiss();
+                                    }
+                                } catch (Throwable ignore) {}
+                                progressDialog[0] = null;
+                            }
+                        };
 
-                        boolean ok = false;
+                        TLRPC.WebPage articlePage = null;
                         if (response instanceof TL_account.webPagePreview) {
                             final TL_account.webPagePreview preview = (TL_account.webPagePreview) response;
                             MessagesController.getInstance(currentAccount).putUsers(preview.users, false);
@@ -341,14 +347,22 @@ public class Browser {
                             if (preview.media instanceof TLRPC.TL_messageMediaWebPage) {
                                 TLRPC.TL_messageMediaWebPage webPage = (TLRPC.TL_messageMediaWebPage) preview.media;
                                 if (webPage.webpage instanceof TLRPC.TL_webPage && webPage.webpage.cached_page != null) {
-                                    NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.openArticle, webPage.webpage, finalUri.toString());
-                                    ok = true;
+                                    articlePage = webPage.webpage;
                                 }
                             }
                         }
-                        if (!ok) {
-                            openUrl(context, finalUri, allowCustom, false);
+                        if (articlePage != null) {
+                            endLoading.run();
+                            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.openArticle, articlePage, finalUri.toString());
+                            return;
                         }
+                        // Nagram: no Instant View from Telegram, try to build one from the Telegraph page (image-only pages)
+                        forcedIvCancel[0] = TelegraphInstantView.tryOpen(currentAccount, finalUri, endLoading, () -> openUrl(context, finalUri, allowCustom, false));
+                        if (forcedIvCancel[0] != null) {
+                            return;
+                        }
+                        endLoading.run();
+                        openUrl(context, finalUri, allowCustom, false);
                     }));
                     if (inCaseLoading != null) {
                         inCaseLoading.init();
@@ -358,7 +372,12 @@ public class Browser {
                                 return;
                             }
                             try {
-                                progressDialog[0].setOnCancelListener(dialog -> ConnectionsManager.getInstance(UserConfig.selectedAccount).cancelRequest(reqId, true));
+                                progressDialog[0].setOnCancelListener(dialog -> {
+                                    ConnectionsManager.getInstance(UserConfig.selectedAccount).cancelRequest(reqId, true);
+                                    if (forcedIvCancel[0] != null) {
+                                        forcedIvCancel[0].run();
+                                    }
+                                });
                                 progressDialog[0].show();
                             } catch (Exception ignore) {}
                         }, 1000);
