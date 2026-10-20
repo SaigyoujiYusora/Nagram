@@ -12813,23 +12813,11 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
                     } else if (currentPhoto instanceof WebInstantView.WebPhoto) {
                         autoDownload = true;
                         imageView.setStrippedLocation(null);
-                        final WebInstantView.WebPhoto webPhoto = (WebInstantView.WebPhoto) currentPhoto;
-                        // Intentionally no requestLayout when size becomes known: fixed 3:4
-                        // placeholders keep layout stable so RecyclerView only binds the viewport
-                        // (+prefetch), matching stock IV lazy loading without cascading all images.
                         imageView.setDelegate(null);
-                        if (webPhoto.instantView != null && webPhoto.instantView.useImageLoader) {
-                            final int fw = Math.max(1, (int) (photoWidth / AndroidUtilities.density));
-                            final int fh = Math.max(1, (int) (photoHeight / AndroidUtilities.density));
-                            final String webFilter = String.format(Locale.US, "%d_%d", fw, fh);
-                            // parentObject null: path HTTP loads must not depend on WebPage FileLoader semantics
-                            imageView.setImage(ImageLocation.getForPath(webPhoto.url), webFilter, null, null, null, 0, null, null, 1);
-                        } else if (webPhoto.instantView != null) {
-                            WebInstantView.loadPhoto(webPhoto, imageView, null);
-                        } else {
-                            // instantView missing: still try plain HTTP via ImageLoader
-                            imageView.setImage(ImageLocation.getForPath(webPhoto.url), null, null, null, null, 0, null, null, 1);
-                        }
+                        // Stock browser-IV path: HttpGetBitmapTask via WebInstantView.loadPhoto.
+                        // Do not pass a size callback — fixed 3:4 placeholders avoid requestLayout
+                        // cascades that would bind/download every image on a long page.
+                        WebInstantView.loadPhoto((WebInstantView.WebPhoto) currentPhoto, imageView, null);
                     } else {
                         final File path = FileLoader.getInstance(parent.getCurrentAccount()).getPathToAttach(currentPhotoObject, true);
                         if (autoDownload || path.exists()) {

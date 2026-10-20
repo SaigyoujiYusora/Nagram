@@ -214,8 +214,15 @@ public class WebInstantView {
                 return;
             }
             currentImageReceivers = new ArrayList<>();
+            // CRITICAL: register the requesting receiver. Without this, the HTTP completes into
+            // loadedPhotos but nobody is notified — stock IV only works because requestLayout()
+            // triggers a second loadPhoto that hits the cache. Our fixed-aspect (no relayout)
+            // path must notify on the first completion.
+            currentImageReceivers.add(new Pair<>(imageReceiver, receivedSize));
             loadingPhotos.put(photo.url, currentImageReceivers);
-            new HttpGetBitmapTask(bitmap -> AndroidUtilities.runOnUIThread(() -> {
+            // Cap decode size to the larger screen side so long image galleries do not OOM.
+            final int maxSide = Math.max(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y);
+            HttpGetBitmapTask task = new HttpGetBitmapTask(bitmap -> AndroidUtilities.runOnUIThread(() -> {
                 if (loadingPhotos == null) return;
                 final boolean updatedSize = (photo.w <= 0 || photo.h <= 0) && bitmap != null;
                 if (bitmap != null) {
@@ -244,7 +251,20 @@ public class WebInstantView {
                     }
                 }
 
-            })).execute(photo.url);
+            }));
+            try {
+                final String pageUrl = this.url;
+                if (pageUrl != null && pageUrl.startsWith("http")) {
+                    final android.net.Uri pageUri = android.net.Uri.parse(pageUrl);
+                    final String host = pageUri.getHost();
+                    task.setHeader("Referer", host != null ? ("https://" + host + "/") : "https://telegra.ph/");
+                } else {
+                    task.setHeader("Referer", "https://telegra.ph/");
+                }
+            } catch (Throwable ignore) {
+                task.setHeader("Referer", "https://telegra.ph/");
+            }
+            task.setMaxSide(maxSide).execute(photo.url);
         } catch (Exception e) {
             FileLog.e(e);
         }

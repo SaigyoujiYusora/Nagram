@@ -184,7 +184,10 @@ public final class TelegraphInstantView {
     public static TLRPC.TL_webPage buildWebPage(String url, TelegraphPageParser.Result result) {
         final WebInstantView instant = new WebInstantView();
         instant.url = url;
-        instant.useImageLoader = true;
+        // Use stock WebInstantView.loadPhoto (HttpGetBitmapTask), NOT ImageLoader.
+        // ImageLoader.getForPath HTTP loads were failing silently here (blank cells + blank
+        // PhotoViewer); browser-generated IV has always used loadPhoto successfully.
+        instant.useImageLoader = false;
 
         final TL_iv.TL_page page = new TL_iv.TL_page();
         page.web = true;

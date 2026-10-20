@@ -17247,12 +17247,15 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             TLObject media = pageBlocksAdapter.getMedia(index);
             TLRPC.PhotoSize fileLocation = pageBlocksAdapter.getFileLocation(media, size);
             if (media instanceof WebInstantView.WebPhoto && !TextUtils.isEmpty(((WebInstantView.WebPhoto) media).url)) {
-                // Nagram: photos of generated (web / forced Telegraph) Instant View pages are plain http urls
+                // Nagram: same path as ArticleViewer / browser IV — HttpGetBitmapTask, not ImageLoader
                 ImageReceiver.BitmapHolder placeHolder = null;
                 if (currentThumb != null && imageReceiver == centerImage) {
                     placeHolder = currentThumb;
                 }
-                imageReceiver.setImage(ImageLocation.getForPath(((WebInstantView.WebPhoto) media).url), null, null, null, placeHolder != null ? new BitmapDrawable(placeHolder.bitmap) : null, 0, null, pageBlocksAdapter.getParentObject(), 1);
+                if (placeHolder != null) {
+                    imageReceiver.setImageBitmap(new BitmapDrawable(placeHolder.bitmap));
+                }
+                WebInstantView.loadPhoto((WebInstantView.WebPhoto) media, imageReceiver, null);
             } else if (fileLocation != null) {
                 if (media instanceof TLRPC.Photo) {
                     TLRPC.Photo photo = (TLRPC.Photo) media;
