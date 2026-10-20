@@ -6,15 +6,24 @@ import android.text.TextUtils;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_iv;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.web.WebInstantView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -24,10 +33,13 @@ import xyz.nextalone.nagram.NaConfig;
  * Forces Instant View for telegra.ph / te.legra.ph / graph.org pages that Telegram has no
  * Instant View for (typically image-only pages). The page is fetched through the Telegraph API
  * (falling back to the public HTML) and rendered as a locally built {@link TL_iv.TL_page}.
+ * <p>
+ * Images are not downloaded here — only the page JSON/HTML. ArticleViewer loads image URLs
+ * lazily as cells attach (viewport), matching stock Instant View behaviour.
  */
 public final class TelegraphInstantView {
 
-    private static final int TIMEOUT_MS = 15000;
+    private static final int TIMEOUT_MS = 20000;
     private static final int MAX_BYTES = 8 * 1024 * 1024;
 
     private TelegraphInstantView() {
@@ -41,16 +53,32 @@ public final class TelegraphInstantView {
     public static String getPagePath(Uri uri) {
         if (uri == null) return null;
         String host = uri.getHost();
+        if (host == null) {
+            // some URIs only have encoded authority in the string
+            host = AndroidUtilities.getHostAuthority(uri.toString(), true);
+        }
         if (host == null) return null;
         host = host.toLowerCase(Locale.ROOT);
         if (host.startsWith("www.")) host = host.substring(4);
         if (!host.equals("telegra.ph") && !host.equals("te.legra.ph") && !host.equals("graph.org")) {
             return null;
         }
-        List<String> segments = uri.getPathSegments();
-        if (segments == null || segments.size() != 1) return null;
+        final List<String> raw = uri.getPathSegments();
+        if (raw == null || raw.isEmpty()) return null;
+        final List<String> segments = new ArrayList<>(raw.size());
+        for (String s : raw) {
+            if (!TextUtils.isEmpty(s)) segments.add(s);
+        }
+        if (segments.size() != 1) return null;
         String path = segments.get(0);
         if (TextUtils.isEmpty(path)) return null;
+        // path segments are decoded; if we somehow got a still-encoded token, decode once
+        if (path.indexOf('%') >= 0) {
+            try {
+                path = Uri.decode(path);
+            } catch (Throwable ignore) {
+            }
+        }
         switch (path.toLowerCase(Locale.ROOT)) {
             case "api":
             case "upload":
@@ -64,6 +92,13 @@ public final class TelegraphInstantView {
                 return null;
         }
         return path;
+    }
+
+    /** True when Telegram's IV for this page is missing or has no photos (image-only pages). */
+    public static boolean shouldOverrideTelegramIv(Uri uri, TLRPC.WebPage telegramPage) {
+        if (!isEnabled() || getPagePath(uri) == null) return false;
+        if (telegramPage == null || telegramPage.cached_page == null) return true;
+        return telegramPage.cached_page.photos == null || telegramPage.cached_page.photos.isEmpty();
     }
 
     /**
@@ -81,24 +116,28 @@ public final class TelegraphInstantView {
         final boolean[] cancelled = new boolean[]{false};
         Utilities.globalQueue.postRunnable(() -> {
             TelegraphPageParser.Result result = null;
+            Throwable lastError = null;
             try {
-                String json = httpGet("https://api.telegra.ph/getPage/" + Uri.encode(path) + "?return_content=true");
+                String json = httpGetApi(path);
                 result = TelegraphPageParser.parseApi(json);
             } catch (Throwable e) {
+                lastError = e;
                 FileLog.e("TelegraphInstantView: api failed for " + path, e);
             }
             if (result == null || result.imageCount() == 0) {
                 try {
-                    String html = httpGet("https://telegra.ph/" + Uri.encode(path));
+                    String html = httpGetHtml(path);
                     TelegraphPageParser.Result htmlResult = TelegraphPageParser.parseHtml(html);
-                    if (result == null || htmlResult.imageCount() > 0) {
+                    if (result == null || htmlResult.imageCount() > result.imageCount()) {
                         result = htmlResult;
                     }
                 } catch (Throwable e) {
+                    if (lastError == null) lastError = e;
                     FileLog.e("TelegraphInstantView: html failed for " + path, e);
                 }
             }
             final TelegraphPageParser.Result finalResult = result;
+            final Throwable error = lastError;
             AndroidUtilities.runOnUIThread(() -> {
                 if (onLoadingEnd != null) onLoadingEnd.run();
                 if (cancelled[0]) return;
@@ -107,17 +146,39 @@ public final class TelegraphInstantView {
                     try {
                         webPage = buildWebPage(url, finalResult);
                     } catch (Throwable e) {
-                        FileLog.e(e);
+                        FileLog.e("TelegraphInstantView: buildWebPage failed", e);
                     }
+                } else if (error != null) {
+                    FileLog.e("TelegraphInstantView: no images for " + path + " err=" + error);
+                } else {
+                    FileLog.e("TelegraphInstantView: no images for " + path);
                 }
+                boolean opened = false;
                 if (webPage != null) {
-                    NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.openArticle, webPage, url);
-                } else if (fallback != null) {
+                    opened = openArticleViewer(currentAccount, webPage, url);
+                }
+                if (!opened && fallback != null) {
                     fallback.run();
                 }
             });
         });
         return () -> cancelled[0] = true;
+    }
+
+    private static boolean openArticleViewer(int currentAccount, TLRPC.TL_webPage webPage, String url) {
+        try {
+            BaseFragment fragment = LaunchActivity.getSafeLastFragment();
+            if (fragment != null) {
+                boolean ok = fragment.createArticleViewer(false).open(webPage, url);
+                if (ok) return true;
+                FileLog.e("TelegraphInstantView: ArticleViewer.open returned false");
+            }
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.openArticle, webPage, url);
+            return true;
+        } catch (Throwable e) {
+            FileLog.e("TelegraphInstantView: openArticleViewer failed", e);
+            return false;
+        }
     }
 
     public static TLRPC.TL_webPage buildWebPage(String url, TelegraphPageParser.Result result) {
@@ -145,6 +206,10 @@ public final class TelegraphInstantView {
                 photo.id = -1 - page.photos.size();
                 photo.url = item.src;
                 photo.urls.add(item.src);
+                // Stable placeholder aspect (3:4) so the list lays out without downloading.
+                // Do NOT discover real size via requestLayout — that cascades loads for every image.
+                photo.w = 3;
+                photo.h = 4;
                 page.photos.add(photo);
 
                 final TL_iv.pageBlockPhoto block = new TL_iv.pageBlockPhoto();
@@ -165,10 +230,11 @@ public final class TelegraphInstantView {
         }
 
         final TLRPC.TL_webPage webPage = new TLRPC.TL_webPage();
-        webPage.id = -(0x7f000000L + (url.hashCode() & 0xffffffffL));
+        // Stable negative id from url so BottomSheetTabs can match on reopen without colliding with server ids
+        webPage.id = Long.MIN_VALUE + 1 + (url.hashCode() & 0xffffffffL);
         webPage.url = url;
         webPage.display_url = url.replaceFirst("^https?://", "");
-        webPage.type = "telegraph";
+        webPage.type = "article";
         webPage.flags |= 2 | 4 | 1024;
         webPage.site_name = "Telegraph";
         webPage.title = TextUtils.isEmpty(result.title) ? "Telegraph" : result.title;
@@ -189,15 +255,50 @@ public final class TelegraphInstantView {
         return t;
     }
 
+    private static String httpGetApi(String path) throws Exception {
+        // Prefer java.net.URI so unicode paths are encoded exactly once (avoids Uri.encode quirks).
+        Exception last = null;
+        final String[] urls = new String[]{
+                new URI("https", "api.telegra.ph", "/getPage/" + path, "return_content=true", null).toASCIIString(),
+                "https://api.telegra.ph/getPage/" + URLEncoder.encode(path, "UTF-8").replace("+", "%20") + "?return_content=true"
+        };
+        for (String url : urls) {
+            try {
+                return httpGet(url);
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new IllegalStateException("api fetch failed");
+    }
+
+    private static String httpGetHtml(String path) throws Exception {
+        Exception last = null;
+        final String[] urls = new String[]{
+                new URI("https", "telegra.ph", "/" + path, null, null).toASCIIString(),
+                "https://telegra.ph/" + URLEncoder.encode(path, "UTF-8").replace("+", "%20")
+        };
+        for (String url : urls) {
+            try {
+                return httpGet(url);
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new IllegalStateException("html fetch failed");
+    }
+
     private static String httpGet(String urlString) throws Exception {
         HttpURLConnection connection = null;
         try {
-            connection = (HttpURLConnection) new URL(urlString).openConnection();
+            final URL url = new URL(urlString);
+            connection = openConnection(url);
             connection.setConnectTimeout(TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
             connection.setInstanceFollowRedirects(true);
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Nagram");
-            connection.setRequestProperty("Accept-Language", "en");
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+            connection.setRequestProperty("Accept", "application/json, text/html;q=0.9, */*;q=0.8");
+            connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
             final int code = connection.getResponseCode();
             if (code < 200 || code >= 300) {
                 throw new IllegalStateException("HTTP " + code + " for " + urlString);
@@ -219,5 +320,18 @@ public final class TelegraphInstantView {
                 connection.disconnect();
             }
         }
+    }
+
+    /** Use Telegram's SOCKS proxy when configured (MTProto secret proxies cannot tunnel plain HTTP). */
+    private static HttpURLConnection openConnection(URL url) throws Exception {
+        if (SharedConfig.isProxyEnabled() && SharedConfig.currentProxy != null
+                && TextUtils.isEmpty(SharedConfig.currentProxy.secret)
+                && !TextUtils.isEmpty(SharedConfig.currentProxy.address)
+                && SharedConfig.currentProxy.port > 0) {
+            final Proxy proxy = new Proxy(Proxy.Type.SOCKS,
+                    new InetSocketAddress(SharedConfig.currentProxy.address, SharedConfig.currentProxy.port));
+            return (HttpURLConnection) url.openConnection(proxy);
+        }
+        return (HttpURLConnection) url.openConnection();
     }
 }

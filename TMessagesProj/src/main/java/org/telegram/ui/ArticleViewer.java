@@ -5589,7 +5589,8 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
             if (webpage == null) {
                 webpage = messageObject.messageOwner.media.webpage;
             }
-            if (webpage != null && webpage.cached_page != null && webpage.cached_page.local != null) {
+            if (webpage != null && webpage.cached_page != null && (webpage.cached_page.local != null || webpage.cached_page.web)) {
+                // local markdown pages, browser-generated IV, and forced Telegraph IV
                 localWebpage = true;
             }
             int index;
@@ -12624,6 +12625,10 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
 
             setWillNotDraw(false);
             imageView = new ImageReceiver(this);
+            // Only start HTTP/FileLoader work once the cell is attached (on screen / nearby).
+            // Stock BackupImageView does this; without it, measure/bind of off-screen holders
+            // can queue downloads for every photo on a long Telegraph page.
+            imageView.setAllowLoadingOnAttachedOnly(true);
             channelCell = new BlockChannelCell(context, parent, adapter, 1);
             radialProgress = new RadialProgress2(this);
             radialProgress.setProgressColor(0xffffffff);
@@ -12759,9 +12764,10 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
                         WebInstantView.WebPhoto webphoto = (WebInstantView.WebPhoto) currentPhoto;
                         w = webphoto.w;
                         h = webphoto.h;
-                        if ((w <= 0 || h <= 0) && webphoto.instantView != null && webphoto.instantView.useImageLoader) {
-                            // size unknown until the image is loaded: reserve a square placeholder
-                            w = h = 1;
+                        if (w <= 0 || h <= 0) {
+                            // fallback aspect if a WebPhoto was built without sizes
+                            w = 3;
+                            h = 4;
                         }
                     } else {
                         w = currentPhotoObject.w;
@@ -12811,17 +12817,14 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
                         autoDownload = true;
                         imageView.setStrippedLocation(null);
                         final WebInstantView.WebPhoto webPhoto = (WebInstantView.WebPhoto) currentPhoto;
-                        final int filterSide = (int) (Math.min(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y) / AndroidUtilities.density);
-                        final String webFilter = String.format(Locale.US, "%d_%d", filterSide, filterSide);
-                        imageView.setDelegate((receiver, set, thumb, memCache) -> {
-                            if (!set || thumb || currentPhoto != webPhoto || webPhoto.w > 0 && webPhoto.h > 0) return;
-                            final int bw = receiver.getBitmapWidth(), bh = receiver.getBitmapHeight();
-                            if (bw > 0 && bh > 0) {
-                                webPhoto.w = bw;
-                                webPhoto.h = bh;
-                                AndroidUtilities.runOnUIThread(this::requestLayout);
-                            }
-                        });
+                        // Downsample to the on-screen cell size (still one HTTP GET of the original
+                        // file — telegra.ph has no size variants — but only for attached cells).
+                        final int fw = Math.max(1, (int) (photoWidth / AndroidUtilities.density));
+                        final int fh = Math.max(1, (int) (photoHeight / AndroidUtilities.density));
+                        final String webFilter = String.format(Locale.US, "%d_%d", fw, fh);
+                        // Intentionally no requestLayout on load: changing cell height after bind
+                        // pulls more placeholders into the viewport and queues every image on the page.
+                        imageView.setDelegate(null);
                         imageView.setImage(ImageLocation.getForPath(webPhoto.url), webFilter, null, null, null, 0, null, adapter != null ? adapter.currentPage : parentObject, 1);
                     } else if (currentPhoto instanceof WebInstantView.WebPhoto) {
                         autoDownload = true;

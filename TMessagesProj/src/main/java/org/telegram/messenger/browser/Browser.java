@@ -351,14 +351,21 @@ public class Browser {
                                 }
                             }
                         }
-                        if (articlePage != null) {
+                        // Nagram: for Telegraph image-only pages Telegram may return no IV, or an empty
+                        // cached_page with zero photos — prefer our forced IV over opening the browser.
+                        if (articlePage != null && !TelegraphInstantView.shouldOverrideTelegramIv(finalUri, articlePage)) {
                             endLoading.run();
                             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.openArticle, articlePage, finalUri.toString());
                             return;
                         }
-                        // Nagram: no Instant View from Telegram, try to build one from the Telegraph page (image-only pages)
                         forcedIvCancel[0] = TelegraphInstantView.tryOpen(currentAccount, finalUri, endLoading, () -> openUrl(context, finalUri, allowCustom, false));
                         if (forcedIvCancel[0] != null) {
+                            return;
+                        }
+                        if (articlePage != null) {
+                            // force IV unavailable; fall back to whatever Telegram gave us
+                            endLoading.run();
+                            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.openArticle, articlePage, finalUri.toString());
                             return;
                         }
                         endLoading.run();
