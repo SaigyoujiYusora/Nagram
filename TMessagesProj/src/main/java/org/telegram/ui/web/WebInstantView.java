@@ -7,6 +7,7 @@ import static org.telegram.messenger.LocaleController.getString;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.os.AsyncTask;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.os.Build;
@@ -242,6 +243,9 @@ public class WebInstantView {
                         }
                     }
                 }
+                if (bitmap == null) {
+                    FileLog.e("WebInstantView.loadPhoto failed url=" + photo.url + " socks=" + tw.nekomimi.nekogram.helpers.ProxyHttp.canUseSocksProxy());
+                }
                 final ArrayList<Pair<ImageReceiver, Runnable>> receivingImageReceivers = loadingPhotos.remove(photo.url);
                 if (receivingImageReceivers == null) return;
                 for (Pair<ImageReceiver, Runnable> pair : receivingImageReceivers) {
@@ -264,7 +268,8 @@ public class WebInstantView {
             } catch (Throwable ignore) {
                 task.setHeader("Referer", "https://telegra.ph/");
             }
-            task.setMaxSide(maxSide).execute(photo.url);
+            // THREAD_POOL so multiple viewport images load in parallel (default execute is serial)
+            task.setMaxSide(maxSide).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, photo.url);
         } catch (Exception e) {
             FileLog.e(e);
         }

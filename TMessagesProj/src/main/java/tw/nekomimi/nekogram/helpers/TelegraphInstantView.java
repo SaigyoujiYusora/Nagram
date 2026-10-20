@@ -6,7 +6,6 @@ import android.text.TextUtils;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLRPC;
@@ -18,8 +17,6 @@ import org.telegram.ui.web.WebInstantView;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -325,16 +322,7 @@ public final class TelegraphInstantView {
         }
     }
 
-    /** Use Telegram's SOCKS proxy when configured (MTProto secret proxies cannot tunnel plain HTTP). */
     private static HttpURLConnection openConnection(URL url) throws Exception {
-        if (SharedConfig.isProxyEnabled() && SharedConfig.currentProxy != null
-                && TextUtils.isEmpty(SharedConfig.currentProxy.secret)
-                && !TextUtils.isEmpty(SharedConfig.currentProxy.address)
-                && SharedConfig.currentProxy.port > 0) {
-            final Proxy proxy = new Proxy(Proxy.Type.SOCKS,
-                    new InetSocketAddress(SharedConfig.currentProxy.address, SharedConfig.currentProxy.port));
-            return (HttpURLConnection) url.openConnection(proxy);
-        }
-        return (HttpURLConnection) url.openConnection();
+        return ProxyHttp.open(url);
     }
 }

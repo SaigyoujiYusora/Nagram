@@ -16,6 +16,8 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
+import tw.nekomimi.nekogram.helpers.ProxyHttp;
+
 public class HttpGetBitmapTask extends AsyncTask<String, Void, Bitmap> {
 
     private final HashMap<String, String> headers = new HashMap<>();
@@ -44,7 +46,7 @@ public class HttpGetBitmapTask extends AsyncTask<String, Void, Bitmap> {
         HttpURLConnection urlConnection = null;
         try {
             URL url = new URL(urlString);
-            urlConnection = (HttpURLConnection) url.openConnection();
+            urlConnection = ProxyHttp.open(url);
             for (Map.Entry<String, String> e : headers.entrySet()) {
                 if (e.getKey() == null || e.getValue() == null) continue;
                 urlConnection.setRequestProperty(e.getKey(), e.getValue());

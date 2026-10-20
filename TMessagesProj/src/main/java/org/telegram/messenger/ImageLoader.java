@@ -577,10 +577,11 @@ public class ImageLoader {
                     }
 
                     URL downloadUrl = new URL(overrideUrl != null ? overrideUrl : location);
-                    httpConnection = (HttpURLConnection) downloadUrl.openConnection();
+                    httpConnection = ProxyConnection.open(downloadUrl);
                     httpConnection.addRequestProperty("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A5297c Safari/602.1");
-                    httpConnection.setConnectTimeout(5000);
-                    httpConnection.setReadTimeout(5000);
+                    // 5s is too aggressive when SOCKS-proxying remote CDNs (e.g. image.acg.lol)
+                    httpConnection.setConnectTimeout(20000);
+                    httpConnection.setReadTimeout(20000);
                     httpConnection.setInstanceFollowRedirects(true);
                     if (!isCancelled()) {
                         httpConnection.connect();
