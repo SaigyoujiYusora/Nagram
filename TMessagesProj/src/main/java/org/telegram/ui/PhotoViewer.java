@@ -8000,6 +8000,23 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                     setScaleToFill();
                 }
             }
+            // WebPhoto / forced Telegraph IV loads via WebInstantView.loadPhoto → setImageBitmap
+            // (HttpGetBitmapTask), not FileLoader. setImageBitmap notifies with thumb=true and never
+            // posts fileLoaded, so checkProgress would leave PROGRESS_EMPTY forever. Clear spinner
+            // once any bitmap (full or static thumb) is on the ImageReceiver.
+            if (set && pageBlocksAdapter != null && photoProgressViews != null) {
+                int a = imageReceiver == centerImage ? 0 : (imageReceiver == rightImage ? 1 : (imageReceiver == leftImage ? 2 : -1));
+                if (a >= 0) {
+                    int idx = currentIndex + (a == 1 ? 1 : (a == 2 ? -1 : 0));
+                    TLObject media = pageBlocksAdapter.getMedia(idx);
+                    if (media instanceof WebInstantView.WebPhoto && imageReceiver.getBitmap() != null) {
+                        photoProgressViews[a].setBackgroundState(PROGRESS_NONE, true, true);
+                        if (a == 0) {
+                            canZoom = !isEmbedVideo;
+                        }
+                    }
+                }
+            }
         };
 
         centerImage.setParentView(containerView);
@@ -16946,9 +16963,28 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 f1 = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_DOCUMENT), currentFileNames[a]);
                 f2 = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE), currentFileNames[a]);
             } else if (pageBlocksAdapter != null) {
+                TLObject pageMedia = pageBlocksAdapter.getMedia(index);
+                // WebPhoto has no FileLoader attach: getFile() is null and getFileName() is "".
+                // Without this branch checkProgress always picks PROGRESS_EMPTY and the spinner never stops.
+                if (pageMedia instanceof WebInstantView.WebPhoto) {
+                    ImageReceiver webIr = a == 0 ? centerImage : (a == 1 ? rightImage : leftImage);
+                    boolean webLoaded = webIr != null && webIr.getBitmap() != null;
+                    AndroidUtilities.runOnUIThread(() -> {
+                        if (webLoaded) {
+                            photoProgressViews[a].setBackgroundState(PROGRESS_NONE, animated, true);
+                            if (a == 0) {
+                                canZoom = !isEmbedVideo;
+                            }
+                        } else {
+                            photoProgressViews[a].setBackgroundState(PROGRESS_EMPTY, animated, true);
+                            photoProgressViews[a].setProgress(0, false);
+                        }
+                    });
+                    return;
+                }
                 f1 = pageBlocksAdapter.getFile(index);
                 isVideo = pageBlocksAdapter.isVideo(index) || pageBlocksAdapter.isHardwarePlayer(index);
-                canStream = isVideo && SharedConfig.streamMedia && pageBlocksAdapter.getMedia(index) instanceof TLRPC.Document;
+                canStream = isVideo && SharedConfig.streamMedia && pageMedia instanceof TLRPC.Document;
                 canAutoPlay = shouldIndexAutoPlayed(index);
             }
             File f1Final = f1;
