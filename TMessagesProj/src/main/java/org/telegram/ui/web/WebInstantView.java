@@ -277,18 +277,18 @@ public class WebInstantView {
 
     public static void cancelLoadPhoto(ImageReceiver imageReceiver) {
         if (loadingPhotos == null) return;
-        for (Map.Entry<String, ArrayList<Pair<ImageReceiver, Runnable>>> e : loadingPhotos.entrySet()) {
-            final String url = e.getKey();
-            final ArrayList<Pair<ImageReceiver, Runnable>> imageReceivers = e.getValue();
-            for (int i = 0; i < imageReceivers.size(); ++i) {
+        // Remove the receiver from every pending url (it may have been asked for several urls in a
+        // row, e.g. a recycled PhotoViewer side image), so no stale result is set on it later.
+        final java.util.Iterator<Map.Entry<String, ArrayList<Pair<ImageReceiver, Runnable>>>> it = loadingPhotos.entrySet().iterator();
+        while (it.hasNext()) {
+            final ArrayList<Pair<ImageReceiver, Runnable>> imageReceivers = it.next().getValue();
+            for (int i = imageReceivers.size() - 1; i >= 0; --i) {
                 if (imageReceivers.get(i).first == imageReceiver) {
                     imageReceivers.remove(i);
-                    break;
                 }
             }
             if (imageReceivers.isEmpty()) {
-                loadingPhotos.remove(url);
-                break;
+                it.remove();
             }
         }
     }

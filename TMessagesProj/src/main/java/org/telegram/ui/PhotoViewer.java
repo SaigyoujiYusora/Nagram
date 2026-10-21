@@ -8004,15 +8004,22 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             // (HttpGetBitmapTask), not FileLoader. setImageBitmap notifies with thumb=true and never
             // posts fileLoaded, so checkProgress would leave PROGRESS_EMPTY forever. Clear spinner
             // once any bitmap (full or static thumb) is on the ImageReceiver.
-            if (set && pageBlocksAdapter != null && photoProgressViews != null) {
+            if (pageBlocksAdapter != null && photoProgressViews != null) {
                 int a = imageReceiver == centerImage ? 0 : (imageReceiver == rightImage ? 1 : (imageReceiver == leftImage ? 2 : -1));
                 if (a >= 0) {
                     int idx = currentIndex + (a == 1 ? 1 : (a == 2 ? -1 : 0));
                     TLObject media = pageBlocksAdapter.getMedia(idx);
-                    if (media instanceof WebInstantView.WebPhoto && imageReceiver.getBitmap() != null) {
-                        photoProgressViews[a].setBackgroundState(PROGRESS_NONE, true, true);
-                        if (a == 0) {
-                            canZoom = !isEmbedVideo;
+                    if (media instanceof WebInstantView.WebPhoto) {
+                        if (set && imageReceiver.getBitmap() != null) {
+                            photoProgressViews[a].setBackgroundState(PROGRESS_NONE, true, true);
+                            if (a == 0) {
+                                canZoom = !isEmbedVideo;
+                            }
+                        } else if (!set) {
+                            // HTTP load failed (setImageBitmap(null)): keep a placeholder so paging is not
+                            // blocked at this image, and stop the spinner.
+                            imageReceiver.setImageBitmap(new WebPhotoPlaceholder((WebInstantView.WebPhoto) media), false);
+                            photoProgressViews[a].setBackgroundState(PROGRESS_NONE, true, true);
                         }
                     }
                 }
@@ -14916,6 +14923,30 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         return MediaDataController.getMediaType(message.messageOwner) == sharedMediaType;
     }
 
+    /** Transparent drawable with the photo's aspect ratio, used while a WebPhoto is loading. */
+    private static class WebPhotoPlaceholder extends ColorDrawable {
+        private final int w, h;
+
+        WebPhotoPlaceholder(WebInstantView.WebPhoto photo) {
+            super(0x00000000);
+            int pw = photo != null && photo.w > 0 ? photo.w : 3;
+            int ph = photo != null && photo.h > 0 ? photo.h : 4;
+            float scale = 1000f / Math.max(pw, ph);
+            w = Math.max(1, Math.round(pw * scale));
+            h = Math.max(1, Math.round(ph * scale));
+        }
+
+        @Override
+        public int getIntrinsicWidth() {
+            return w;
+        }
+
+        @Override
+        public int getIntrinsicHeight() {
+            return h;
+        }
+    }
+
     private void setImages() {
         if (animationInProgress == 0) {
             setIndexToImage(centerImage, currentIndex, null);
@@ -17288,9 +17319,13 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 if (currentThumb != null && imageReceiver == centerImage) {
                     placeHolder = currentThumb;
                 }
-                if (placeHolder != null) {
-                    imageReceiver.setImageBitmap(new BitmapDrawable(placeHolder.bitmap));
-                }
+                // Always reset the receiver first: setImageBitmap() cancels the receiver's pending
+                // WebInstantView load (via ImageLoader.cancelLoadingForImageReceiver), so a late HTTP
+                // result for the image this recycled left/center/right receiver showed before can no
+                // longer land on it, and the old bitmap is not shown while the new one loads.
+                // A sized placeholder also keeps hasImageSet() true, which the swipe code requires
+                // to page further (stock IV gets that from setImage(ImageLocation) before loading).
+                imageReceiver.setImageBitmap(placeHolder != null ? new BitmapDrawable(placeHolder.bitmap) : new WebPhotoPlaceholder((WebInstantView.WebPhoto) media));
                 WebInstantView.loadPhoto((WebInstantView.WebPhoto) media, imageReceiver, null);
             } else if (fileLocation != null) {
                 if (media instanceof TLRPC.Photo) {
