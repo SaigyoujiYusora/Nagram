@@ -14847,7 +14847,11 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         gestureDetector.setOnDoubleTapListener(value ? this : null);
     }
 
-    private static final int SEED_IMAGES_PER_SIDE = 30;
+    private static final int SEED_IMAGES_MAX = 100;
+
+    private static int seedLimit(int value) {
+        return Math.max(0, Math.min(SEED_IMAGES_MAX, value));
+    }
 
     /**
      * Opening a photo from a chat used to show only that photo until the shared media count and the
@@ -14880,14 +14884,17 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         }
         // chat messages are newest first; the viewer list is oldest first
         ArrayList<MessageObject> older = new ArrayList<>();
-        for (int a = center + 1; a < source.size() && older.size() < SEED_IMAGES_PER_SIDE; a++) {
+        // Nagram: nearby window size is configurable (N config > nearby photos before / after)
+        final int seedBefore = seedLimit(xyz.nextalone.nagram.NaConfig.INSTANCE.getPhotoViewerNearbyBefore().Int());
+        final int seedAfter = seedLimit(xyz.nextalone.nagram.NaConfig.INSTANCE.getPhotoViewerNearbyAfter().Int());
+        for (int a = center + 1; a < source.size() && older.size() < seedBefore; a++) {
             MessageObject message = source.get(a);
             if (isSeedable(message)) {
                 older.add(0, message);
             }
         }
         ArrayList<MessageObject> newer = new ArrayList<>();
-        for (int a = center - 1; a >= 0 && newer.size() < SEED_IMAGES_PER_SIDE; a--) {
+        for (int a = center - 1; a >= 0 && newer.size() < seedAfter; a--) {
             MessageObject message = source.get(a);
             if (isSeedable(message)) {
                 newer.add(message);

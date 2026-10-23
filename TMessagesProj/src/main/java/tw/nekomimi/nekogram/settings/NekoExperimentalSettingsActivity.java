@@ -46,6 +46,7 @@ import java.util.regex.Pattern;
 import kotlin.Unit;
 
 import tw.nekomimi.nekogram.NekoXConfig;
+import tw.nekomimi.nekogram.config.ConfigItem;
 import tw.nekomimi.nekogram.ui.PopupBuilder;
 import tw.nekomimi.nekogram.utils.FileUtil;
 import tw.nekomimi.nekogram.utils.ZipUtil;
@@ -99,6 +100,8 @@ public class NekoExperimentalSettingsActivity extends BaseNekoXSettingsActivity 
     private final AbstractConfigCell forceCopyRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getForceCopy()));
     private final AbstractConfigCell noQuoteCopyFallbackRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getNoQuoteCopyFallback(), LocaleController.getString(R.string.NoQuoteCopyFallbackDesc)));
     private final AbstractConfigCell forceTelegraphInstantViewRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getForceTelegraphInstantView(), LocaleController.getString(R.string.ForceTelegraphInstantViewDesc)));
+    private final AbstractConfigCell photoViewerNearbyBeforeRow = cellGroup.appendCell(new ConfigCellCustom("PhotoViewerNearbyBefore", CellGroup.ITEM_TYPE_TEXT_SETTINGS_CELL, true));
+    private final AbstractConfigCell photoViewerNearbyAfterRow = cellGroup.appendCell(new ConfigCellCustom("PhotoViewerNearbyAfter", CellGroup.ITEM_TYPE_TEXT_SETTINGS_CELL, true));
     private final AbstractConfigCell disableFlagSecureRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getDisableFlagSecure()));
     private final AbstractConfigCell audioEnhanceRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getNoiseSuppressAndVoiceEnhance()));
     private final AbstractConfigCell showRPCErrorRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getShowRPCError()));
@@ -259,6 +262,20 @@ public class NekoExperimentalSettingsActivity extends BaseNekoXSettingsActivity 
                             AndroidUtilities.runOnUIThread(() -> AlertsCreator.processError(currentAccount, error, this, req));
                         }
                     }));
+                } else if (position == cellGroup.rows.indexOf(photoViewerNearbyBeforeRow) || position == cellGroup.rows.indexOf(photoViewerNearbyAfterRow)) {
+                    final ConfigItem item = position == cellGroup.rows.indexOf(photoViewerNearbyBeforeRow) ? NaConfig.INSTANCE.getPhotoViewerNearbyBefore() : NaConfig.INSTANCE.getPhotoViewerNearbyAfter();
+                    final int[] counts = {0, 5, 10, 20, 30, 50, 80, 100};
+                    final String[] items = new String[counts.length];
+                    for (int i = 0; i < counts.length; i++) {
+                        items[i] = counts[i] == 30 ? counts[i] + " (" + LocaleController.getString(R.string.Default) + ")" : String.valueOf(counts[i]);
+                    }
+                    PopupBuilder builder = new PopupBuilder(view);
+                    builder.setItems(items, (i, __) -> {
+                        item.setConfigInt(counts[i]);
+                        listAdapter.notifyItemChanged(position);
+                        return Unit.INSTANCE;
+                    });
+                    builder.show();
                 } else if (position == cellGroup.rows.indexOf(customAudioBitrateRow)) {
                     PopupBuilder builder = new PopupBuilder(view);
                     builder.setItems(new String[]{
@@ -526,7 +543,14 @@ public class NekoExperimentalSettingsActivity extends BaseNekoXSettingsActivity 
                     } else if (holder.itemView instanceof TextSettingsCell) {
                         TextSettingsCell textCell = (TextSettingsCell) holder.itemView;
                         textCell.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-                        if (position == cellGroup.rows.indexOf(customAudioBitrateRow)) {
+                        if (position == cellGroup.rows.indexOf(photoViewerNearbyBeforeRow) || position == cellGroup.rows.indexOf(photoViewerNearbyAfterRow)) {
+                            boolean before = position == cellGroup.rows.indexOf(photoViewerNearbyBeforeRow);
+                            int v = (before ? NaConfig.INSTANCE.getPhotoViewerNearbyBefore() : NaConfig.INSTANCE.getPhotoViewerNearbyAfter()).Int();
+                            String value = String.valueOf(v);
+                            if (v == 30)
+                                value += " (" + LocaleController.getString(R.string.Default) + ")";
+                            textCell.setTextAndValue(LocaleController.getString(before ? R.string.PhotoViewerNearbyBefore : R.string.PhotoViewerNearbyAfter), value, divider);
+                        } else if (position == cellGroup.rows.indexOf(customAudioBitrateRow)) {
                             String value = String.valueOf(NekoConfig.customAudioBitrate.Int()) + "kbps";
                             if (NekoConfig.customAudioBitrate.Int() == 32)
                                 value += " (" + LocaleController.getString("Default", R.string.Default) + ")";

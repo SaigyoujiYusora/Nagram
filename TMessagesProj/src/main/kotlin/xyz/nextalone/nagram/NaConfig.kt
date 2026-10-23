@@ -1418,6 +1418,18 @@ object NaConfig {
             ConfigItem.configTypeBool,
             true
         )
+    val photoViewerNearbyBefore =
+        addConfig(
+            "PhotoViewerNearbyBefore",
+            ConfigItem.configTypeInt,
+            30
+        )
+    val photoViewerNearbyAfter =
+        addConfig(
+            "PhotoViewerNearbyAfter",
+            ConfigItem.configTypeInt,
+            30
+        )
 
     private fun addConfig(
         k: String,
