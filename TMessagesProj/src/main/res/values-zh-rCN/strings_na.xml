@@ -104,7 +104,6 @@
     <string name="DisableSendReadStories">偷偷看动态</string>
     <string name="HideFilterMuteAll">隐藏文件夹中的\"全部取消静音\"</string>
     <string name="UseLocalQuoteColor">本地名称颜色</string>
-    <string name="ShowSquareAvatar">显示方形头像</string>
     <string name="DisableProfileAvatarBlur">禁用资料页大头像按钮背景模糊</string>
     <string name="DisableCustomWallpaperUser">禁用私聊的自定义背景</string>
     <string name="DisableCustomWallpaperChannel">禁用频道的自定义背景</string>
@@ -397,4 +396,25 @@
     <string name="CancelAllDownloads">全部取消</string>
     <string name="CancelAllDownloadsTitle">取消全部下载？</string>
     <string name="CancelAllDownloadsMessage">未完成的下载将从列表中移除，已下载的部分缓存也会被清除。</string>
+    <string name="GlobalDisableLinkPreviews">全局禁用链接预览</string>
+    <string name="RegistrationDateApproximately">约 %s</string>
+    <string name="RegistrationDateOlder">早于 %s</string>
+    <string name="RegistrationDateNewer">晚于 %s</string>
+    <string name="AlwaysSendVideosInHD">总是以高清方式发送视频</string>
+    <string name="ShowChannelIcon">显示图标而不是频道别名</string>
+    <string name="HideSideShareButton">隐藏侧边共享按钮</string>
+    <string name="AskBeforeSendingSticker">发送贴纸前询问</string>
+    <string name="ConfirmSendSticker">确认发送貼圖</string>
+    <string name="ConfirmSendStickerText">您想要发送此贴纸吗？</string>
+    <string name="KeepFormatting">保持格式</string>
+    <string name="AskBeforeSendingGIF">发送 GIF 前询问</string>
+    <string name="ConfirmSendGIF">确认发送 GIF</string>
+    <string name="ConfirmSendGIFText">您想要发送此 GIF 吗？</string>
+    <string name="DisableCommunityChatGrouping">禁用社区会话合并展示</string>
+    <string name="CommunityAvatarTapAction">点击社区头像行为</string>
+    <string name="CommunityAvatarTapActionCommunity">始终打开社区</string>
+    <string name="CommunityAvatarTapActionChat">始终进入聊天</string>
+    <string name="CommunityAvatarTapActionArrow">仅在点击头像右下角箭头时打开社区页</string>
+    <string name="UseSystemNotificationColor">通知图标使用系统主题颜色</string>
+    <string name="AvatarCorners">头像圆角</string>
 </resources>

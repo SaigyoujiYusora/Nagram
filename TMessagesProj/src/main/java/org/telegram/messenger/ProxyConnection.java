@@ -2,6 +2,8 @@ package org.telegram.messenger;
 
 import android.text.TextUtils;
 
+import org.telegram.utils.proxy.ProxySettings;
+
 import java.net.Authenticator;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
@@ -21,33 +23,38 @@ public final class ProxyConnection {
     }
 
     public static boolean canUseSocksProxy() {
-        return SharedConfig.isProxyEnabled()
-                && SharedConfig.currentProxy != null
-                && TextUtils.isEmpty(SharedConfig.currentProxy.secret)
-                && !TextUtils.isEmpty(SharedConfig.currentProxy.address)
-                && SharedConfig.currentProxy.port > 0;
+        final SharedConfig.ProxyInfo info = SharedConfig.currentProxy;
+        if (!SharedConfig.isProxyEnabled() || info == null || info.settings == null) {
+            return false;
+        }
+        final ProxySettings settings = info.settings;
+        return settings.getType() == ProxySettings.Type.SOCKS5
+                && TextUtils.isEmpty(settings.getSecret())
+                && !TextUtils.isEmpty(settings.getAddress())
+                && settings.getPort() > 0;
     }
 
     public static HttpURLConnection open(URL url) throws Exception {
         if (canUseSocksProxy()) {
             final SharedConfig.ProxyInfo info = SharedConfig.currentProxy;
             ensureSocksAuthenticator(info);
-            final Proxy proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(info.address, info.port));
+            final Proxy proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(info.settings.getAddress(), info.settings.getPort()));
             return (HttpURLConnection) url.openConnection(proxy);
         }
         return (HttpURLConnection) url.openConnection();
     }
 
     private static void ensureSocksAuthenticator(SharedConfig.ProxyInfo info) {
-        if (info == null || TextUtils.isEmpty(info.username)) {
+        if (info == null || info.settings == null || TextUtils.isEmpty(info.settings.getUser())) {
             return;
         }
         synchronized (AUTH_LOCK) {
             if (authenticatorInstalled) {
                 return;
             }
-            final String user = info.username;
-            final char[] pass = info.password != null ? info.password.toCharArray() : new char[0];
+            final String user = info.settings.getUser();
+            final String password = info.settings.getPassword();
+            final char[] pass = password != null ? password.toCharArray() : new char[0];
             try {
                 Authenticator.setDefault(new Authenticator() {
                     @Override

@@ -104,7 +104,6 @@
     <string name="DisableSendReadStories">Xem tin tức một cách bí mật</string>
     <string name="HideFilterMuteAll">\"Bật tiếng tất cả\" trong các thư mục ẩn</string>
     <string name="UseLocalQuoteColor">Màu tên cục bộ</string>
-    <string name="ShowSquareAvatar">Hiển thị hình đại diện vuông</string>
     <string name="DisableProfileAvatarBlur">Disable Profile Avatar Blur</string>
     <string name="DisableCustomWallpaperUser">Tắt nền tùy chỉnh cho tin nhắn riêng tư</string>
     <string name="DisableCustomWallpaperChannel">Tắt nền tùy chỉnh cho kênh</string>
@@ -383,4 +382,25 @@
     <string name="SwitchStyleTelegram">Telegram</string>
     <string name="SwitchStyleModern">Modern</string>
     <string name="DisableChatListSwipeGesture">Disable chat list swipe gesture</string>
+    <string name="GlobalDisableLinkPreviews">Global disable link previews</string>
+    <string name="RegistrationDateApproximately">Approximately %s</string>
+    <string name="RegistrationDateOlder">Older than %s</string>
+    <string name="RegistrationDateNewer">Newer than %s</string>
+    <string name="AlwaysSendVideosInHD">Always send videos in HD</string>
+    <string name="ShowChannelIcon">Show icon instead of channel alias</string>
+    <string name="HideSideShareButton">Hide side share button</string>
+    <string name="AskBeforeSendingSticker">Ask before sending sticker</string>
+    <string name="ConfirmSendSticker">Confirm sending sticker</string>
+    <string name="ConfirmSendStickerText">Do you want to send this sticker?</string>
+    <string name="KeepFormatting">Keep formatting</string>
+    <string name="AskBeforeSendingGIF">Ask before sending GIF</string>
+    <string name="ConfirmSendGIF">Confirm sending GIF</string>
+    <string name="ConfirmSendGIFText">Do you want to send this GIF?</string>
+    <string name="DisableCommunityChatGrouping">Disable Community Chat Grouping</string>
+    <string name="CommunityAvatarTapAction">Community Avatar Tap Action</string>
+    <string name="CommunityAvatarTapActionCommunity">Always Open Community</string>
+    <string name="CommunityAvatarTapActionChat">Always Open Chat</string>
+    <string name="CommunityAvatarTapActionArrow">Open Community Only with the Bottom-Right Arrow</string>
+    <string name="UseSystemNotificationColor">Use system notification color</string>
+    <string name="AvatarCorners">Avatar corners</string>
 </resources>

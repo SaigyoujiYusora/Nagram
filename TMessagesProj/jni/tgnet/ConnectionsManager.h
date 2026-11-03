@@ -89,6 +89,9 @@ public:
     void receivedCaptchaResult(int32_t requestTokensCount, int32_t* requestTokens, std::string token);
     void moveToDatacenter(uint32_t datacenterId);
 
+    void importAuthKey(uint32_t dcId, const uint8_t *keyBytes);
+    ByteArray *exportAuthKey(uint32_t dcId);
+
 private:
     static void *ThreadProc(void *data);
     static std::vector<ConnectionsManager*> _instances;
@@ -106,7 +109,7 @@ private:
     void requestSaltsForDatacenter(Datacenter *datacenter, bool media, bool useTempConnection);
     void clearRequestsForDatacenter(Datacenter *datacenter, HandshakeType type);
     void registerForInternalPushUpdates();
-    void processRequestQueue(uint32_t connectionType, uint32_t datacenterId);
+    void processRequestQueue(uint32_t connectionType, uint32_t datacenterId, Connection *connectedDownload = nullptr);
     void authorizeOnMovingDatacenter();
     void authorizedOnMovingDatacenter();
     Datacenter *getDatacenterWithId(uint32_t datacenterId);

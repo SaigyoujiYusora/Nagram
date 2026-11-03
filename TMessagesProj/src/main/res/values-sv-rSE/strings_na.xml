@@ -104,7 +104,6 @@
     <string name="DisableSendReadStories">Inaktivera Skicka Lästa Berättelser</string>
     <string name="HideFilterMuteAll">Dölj filtrera stänga av alla</string>
     <string name="UseLocalQuoteColor">Använd lokal offertfärg</string>
-    <string name="ShowSquareAvatar">Visa fyrkantig avatar</string>
     <string name="DisableProfileAvatarBlur">Inaktivera profilavatar oskärpa</string>
     <string name="DisableCustomWallpaperUser">Inaktivera användaranpassad bakgrundsbild</string>
     <string name="DisableCustomWallpaperChannel">Inaktivera kanalanpassad bakgrundsbild</string>
@@ -383,4 +382,25 @@
     <string name="SwitchStyleTelegram">Telegram</string>
     <string name="SwitchStyleModern">Modern</string>
     <string name="DisableChatListSwipeGesture">Inaktivera snabblista svep gest</string>
+    <string name="GlobalDisableLinkPreviews">Global inaktivera länkförhandsvisningar</string>
+    <string name="RegistrationDateApproximately">Ungefär %s</string>
+    <string name="RegistrationDateOlder">Äldre än %s</string>
+    <string name="RegistrationDateNewer">Nyare än %s</string>
+    <string name="AlwaysSendVideosInHD">Skicka alltid videor i HD</string>
+    <string name="ShowChannelIcon">Visa ikonen istället för kanalalias</string>
+    <string name="HideSideShareButton">Dölj siddelningsknappen</string>
+    <string name="AskBeforeSendingSticker">Fråga innan du skickar klistermärke</string>
+    <string name="ConfirmSendSticker">Bekräfta skicka klistermärke</string>
+    <string name="ConfirmSendStickerText">Vill du skicka detta klistermärke?</string>
+    <string name="KeepFormatting">Fortsätt formatera</string>
+    <string name="AskBeforeSendingGIF">Fråga innan du skickar GIF</string>
+    <string name="ConfirmSendGIF">Bekräfta att GIF skickas</string>
+    <string name="ConfirmSendGIFText">Vill du skicka denna GIF?</string>
+    <string name="DisableCommunityChatGrouping">Inaktivera gruppering av Community Chatt</string>
+    <string name="CommunityAvatarTapAction">Åtgärd för Community Avatar Tap</string>
+    <string name="CommunityAvatarTapActionCommunity">Öppna alltid Community</string>
+    <string name="CommunityAvatarTapActionChat">Öppna alltid chatt</string>
+    <string name="CommunityAvatarTapActionArrow">Öppna gemenskap endast med den nedre högra pilen</string>
+    <string name="UseSystemNotificationColor">Använd systemets aviseringsfärg</string>
+    <string name="AvatarCorners">Avatar hörn</string>
 </resources>
