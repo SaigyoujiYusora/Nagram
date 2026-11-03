@@ -3,6 +3,7 @@ package org.telegram.ui.Components;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -11,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DefaultItemAnimator;
@@ -34,6 +36,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.GraySectionCell;
@@ -507,6 +510,27 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
         }
     }
 
+    // Nagram: cancel all unfinished downloads and release their partial cache
+    private void showCancelAllDownloadsAlert() {
+        if (parentActivity == null || currentLoadingFiles.isEmpty()) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(parentActivity);
+        builder.setTitle(LocaleController.getString(R.string.CancelAllDownloadsTitle));
+        builder.setMessage(LocaleController.getString(R.string.CancelAllDownloadsMessage));
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        builder.setPositiveButton(LocaleController.getString(R.string.CancelAllDownloads), (dialog, which) -> {
+            DownloadController.getInstance(currentAccount).cancelAllDownloadingFiles();
+            update(true);
+        });
+        AlertDialog alertDialog = builder.create();
+        parentFragment.showDialog(alertDialog);
+        TextView button = (TextView) alertDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+        if (button != null) {
+            button.setTextColor(Theme.getColor(Theme.key_text_RedBold));
+        }
+    }
+
     public void search(String query) {
         searchQuery = query;
         update(false);
@@ -544,8 +568,10 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
                 GraySectionCell graySectionCell = (GraySectionCell) holder.itemView;
                 if (position == downloadingFilesHeader) {
                     String header = LocaleController.getString(R.string.Downloading);
+                    graySectionCell.setSecondRightText(LocaleController.getString(R.string.CancelAllDownloads), v -> showCancelAllDownloadsAlert());
                     if (graySectionCell.getText().equals(header)) {
                         graySectionCell.setRightText(hasCurrentDownload ? LocaleController.getString(R.string.PauseAll) : LocaleController.getString(R.string.ResumeAll), hasCurrentDownload);
+                        graySectionCell.requestLayout();
                     } else {
                         graySectionCell.setText(header, hasCurrentDownload ? LocaleController.getString(R.string.PauseAll) : LocaleController.getString(R.string.ResumeAll), new OnClickListener() {
                             @Override
@@ -564,6 +590,7 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
                         });
                     }
                 } else if (position == recentFilesHeader) {
+                    graySectionCell.setSecondRightText(null, null);
                     graySectionCell.setText(LocaleController.getString(R.string.RecentlyDownloaded), LocaleController.getString(R.string.Settings),
                             view -> DownloadsInfoBottomSheet.show(parentActivity, parentFragment)
                     );

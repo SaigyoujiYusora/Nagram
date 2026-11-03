@@ -36,6 +36,7 @@ public class GraySectionCell extends FrameLayout implements Theme.Colorable {
     private AnimatedEmojiSpan.TextViewEmojis textView;
     private AnimatedTextView rightTextView;
     private FrameLayout.LayoutParams rightTextViewLayoutParams;
+    private TextView secondRightTextView; // Nagram: optional extra action placed beside rightTextView
     private final Theme.ResourcesProvider resourcesProvider;
     private int layerHeight = 32;
 
@@ -86,6 +87,57 @@ public class GraySectionCell extends FrameLayout implements Theme.Colorable {
         setBackgroundColor(noBackground ? 0 : getThemedColor(Theme.key_graySection));
         textView.setTextColor(getThemedColor(Theme.key_graySectionText));
         rightTextView.setTextColor(getThemedColor(Theme.key_graySectionText));
+        if (secondRightTextView != null) {
+            secondRightTextView.setTextColor(getThemedColor(Theme.key_graySectionText));
+        }
+    }
+
+    // Nagram: second action button that sits next to (start side of) the right action
+    public void setSecondRightText(CharSequence text, OnClickListener onClickListener) {
+        if (text == null) {
+            if (secondRightTextView != null) {
+                secondRightTextView.setVisibility(GONE);
+                secondRightTextView.setOnClickListener(null);
+            }
+            return;
+        }
+        if (secondRightTextView == null) {
+            secondRightTextView = new TextView(getContext()) {
+                @Override
+                public CharSequence getAccessibilityClassName() {
+                    return Button.class.getName();
+                }
+            };
+            secondRightTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            secondRightTextView.setTextColor(getThemedColor(Theme.key_graySectionText));
+            secondRightTextView.setGravity(Gravity.CENTER_VERTICAL);
+            secondRightTextView.setSingleLine(true);
+            secondRightTextView.setPadding(dp(2), 0, dp(2), 0);
+            addView(secondRightTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.LEFT | Gravity.TOP));
+        }
+        secondRightTextView.setText(text);
+        secondRightTextView.setOnClickListener(onClickListener);
+        secondRightTextView.setVisibility(VISIBLE);
+        requestLayout();
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        if (secondRightTextView != null && secondRightTextView.getVisibility() != GONE) {
+            int w = secondRightTextView.getMeasuredWidth();
+            int h = secondRightTextView.getMeasuredHeight();
+            int gap = dp(12);
+            int x;
+            if (rightTextView.getVisibility() == GONE) {
+                x = LocaleController.isRTL ? rightTextViewLayoutParams.leftMargin : getMeasuredWidth() - rightTextViewLayoutParams.rightMargin - w;
+            } else if (LocaleController.isRTL) {
+                x = rightTextView.getRight() + gap;
+            } else {
+                x = rightTextView.getLeft() - gap - w;
+            }
+            secondRightTextView.layout(x, 0, x + w, h);
+        }
     }
 
     @Override

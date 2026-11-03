@@ -28,6 +28,7 @@ import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_stories;
 import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.LaunchActivity;
+import org.telegram.ui.Storage.CacheModel;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -1804,6 +1805,87 @@ public class DownloadController extends BaseController implements NotificationCe
                 FileLog.e(e);
             }
         });
+    }
+
+    // Nagram: cancel every unfinished download in the downloads list and release its partial cache
+    public void cancelAllDownloadingFiles() {
+        if (downloadingFiles.isEmpty()) {
+            return;
+        }
+        final ArrayList<MessageObject> messageObjects = new ArrayList<>(downloadingFiles);
+        downloadingFiles.clear();
+        final FileLoader fileLoader = getFileLoader();
+        final ArrayList<TLRPC.Document> documents = new ArrayList<>();
+        for (int i = 0; i < messageObjects.size(); i++) {
+            MessageObject messageObject = messageObjects.get(i);
+            if (messageObject == null) {
+                continue;
+            }
+            messageObject.putInDownloadsStore = false;
+            TLRPC.Document document = messageObject.getDocument();
+            if (document == null) {
+                continue;
+            }
+            documents.add(document);
+            fileLoader.cancelLoadFile(document);
+        }
+        getNotificationCenter().postNotificationName(NotificationCenter.onDownloadingFilesChanged);
+
+        getMessagesStorage().getStorageQueue().postRunnable(() -> {
+            try {
+                SQLitePreparedStatement state = getMessagesStorage().getDatabase().executeFast("DELETE FROM downloading_documents WHERE hash = ? AND id = ?");
+                for (int i = 0; i < documents.size(); i++) {
+                    state.requery();
+                    state.bindInteger(1, documents.get(i).dc_id);
+                    state.bindLong(2, documents.get(i).id);
+                    state.step();
+                }
+                state.dispose();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        });
+
+        // cancelLoadFile hops fileLoaderQueue -> stageQueue before the operation stops writing,
+        // so delete the partial files only after both queues have drained the cancel.
+        fileLoader.getFileLoaderQueue().postRunnable(() -> Utilities.stageQueue.postRunnable(() -> Utilities.globalQueue.postRunnable(() -> {
+            File tempDir = FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE);
+            if (tempDir == null) {
+                return;
+            }
+            final String[] suffixes = {".temp", ".temp.enc", ".temp.gz", ".temp.enc.gz", "_64.pt", "_64.preload", "_64.iv", "_64.iv.enc"};
+            ArrayList<CacheModel.FileInfo> removed = new ArrayList<>();
+            for (int i = 0; i < documents.size(); i++) {
+                TLRPC.Document document = documents.get(i);
+                if (document.dc_id == 0 || document.id == 0) {
+                    continue;
+                }
+                if (fileLoader.isLoadingFile(FileLoader.getAttachFileName(document))) {
+                    continue; // restarted meanwhile (e.g. opened in chat), keep its cache
+                }
+                String prefix = document.dc_id + "_" + document.id;
+                for (String suffix : suffixes) {
+                    File file = new File(tempDir, prefix + suffix);
+                    try {
+                        if (file.exists()) {
+                            removed.add(new CacheModel.FileInfo(file));
+                            if (!file.delete()) {
+                                file.deleteOnExit();
+                            }
+                        }
+                    } catch (Exception e) {
+                        FileLog.e(e);
+                    }
+                }
+            }
+            if (!removed.isEmpty()) {
+                try {
+                    fileLoader.getFileDatabase().removeFiles(removed);
+                } catch (Exception e) {
+                    FileLog.e(e);
+                }
+            }
+        })));
     }
 
     public boolean isDownloading(int messageId) {

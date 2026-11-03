@@ -394,4 +394,7 @@
     <string name="NoQuoteCopyConfirmTitle">改为复制发送？</string>
     <string name="NoQuoteCopyConfirmText">%1$d 条消息转发失败（%2$s）。是否改为复制内容并重新上传媒体？已缓存的文件会直接上传，其余文件会先下载。</string>
     <string name="NoQuoteCopyConfirmButton">复制</string>
+    <string name="CancelAllDownloads">全部取消</string>
+    <string name="CancelAllDownloadsTitle">取消全部下载？</string>
+    <string name="CancelAllDownloadsMessage">未完成的下载将从列表中移除，已下载的部分缓存也会被清除。</string>
 </resources>

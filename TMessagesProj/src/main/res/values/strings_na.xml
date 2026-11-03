@@ -395,4 +395,7 @@
     <string name="NoQuoteCopyConfirmTitle">Send a copy instead?</string>
     <string name="NoQuoteCopyConfirmText">Forwarding %1$d message(s) failed (%2$s). Copy the content and re-upload the media instead? Cached files are uploaded directly, others are downloaded first.</string>
     <string name="NoQuoteCopyConfirmButton">Copy</string>
+    <string name="CancelAllDownloads">Cancel all</string>
+    <string name="CancelAllDownloadsTitle">Cancel all downloads?</string>
+    <string name="CancelAllDownloadsMessage">All unfinished downloads will be removed from the list, and their partially downloaded cache will be deleted.</string>
 </resources>
