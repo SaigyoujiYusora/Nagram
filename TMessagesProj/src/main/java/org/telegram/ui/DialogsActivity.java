@@ -1139,7 +1139,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     blurredView.draw(canvas);
                 }
             }
-            if (!hasMainTabs && communityId == 0) {
+            if (!isMainTabsShown() && communityId == 0) {
                 AndroidUtilities.drawNavigationBarProtection(canvas, this, getThemedColor(Theme.key_windowBackgroundWhite), navigationBarHeight);
             }
             wasDrawn = true;
@@ -3025,8 +3025,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         BirthdayController.getInstance(currentAccount).check();
-        additionNavigationBarHeight = hasMainTabs ? dp(MAIN_TABS_HEIGHT_WITH_MARGINS) : 0;
-        additionFloatingButtonOffset = hasMainTabs ? dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN) : 0;
+        additionNavigationBarHeight = isMainTabsShown() ? dp(MAIN_TABS_HEIGHT_WITH_MARGINS) : 0;
+        additionFloatingButtonOffset = isMainTabsShown() ? dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN) : 0;
 
         return true;
     }
@@ -5260,6 +5260,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 if (delegate == null || selectedDialogs.isEmpty()) {
                     return;
                 }
+                forceDocument = false;
                 ArrayList<MessagesStorage.TopicKey> topicKeys = new ArrayList<>();
                 for (int i = 0; i < selectedDialogs.size(); i++) {
                     topicKeys.add(MessagesStorage.TopicKey.of(selectedDialogs.get(i), 0));
@@ -11551,6 +11552,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         sharedMediaEntries = entries;
         sharedLink = null;
+        forceDocument = false;
         if (commentView != null) {
             attachShareTopView(initialCaption);
         } else {
@@ -11703,6 +11705,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             public ImageReceiver.BitmapHolder getThumbForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) {
                 final BackupImageView v = shareTopView != null ? shareTopView.getThumbView(index) : null;
                 return v != null ? v.getImageReceiver().getBitmapSafe() : null;
+            }
+
+            @Override
+            public int getSelectedCount() {
+                return sharedMediaEntries != null ? sharedMediaEntries.size() : 0;
+            }
+
+            @Override
+            public boolean canSendAsFile() {
+                return canSendDocumentsToSelectedDialogs();
             }
 
             @Override
@@ -12129,10 +12141,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         );
     }
 
+    private boolean canSendDocumentsToSelectedDialogs() {
+        for (int i = 0; i < selectedDialogs.size(); ++i) {
+            final TLRPC.Chat chat = getMessagesController().getChat(-selectedDialogs.get(i));
+            if (chat != null && !ChatObject.canSendDocument(chat)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private boolean onSendLongClick(View view) {
         if (getParentActivity() == null) return false;
 
-        boolean onlyMyself = false;
+        boolean onlyMyself = !selectedDialogs.isEmpty();
         boolean canSchedule = true;
         for (int i = 0; i < selectedDialogs.size(); ++i) {
             final long did = selectedDialogs.get(i);
@@ -12148,6 +12170,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         final boolean onlyMyselfFinal = onlyMyself;
 
+        boolean canSendDocs = hasSharedMediaEntries() && canSendDocumentsToSelectedDialogs();
+        if (canSendDocs) {
+            for (MediaController.PhotoEntry entry : sharedMediaEntries) {
+                if (entry.hasVideoEditsLostAsDocument()) {
+                    canSendDocs = false;
+                    break;
+                }
+            }
+        }
+        final boolean multipleMedia = sharedMediaEntries != null && sharedMediaEntries.size() > 1;
+
         ItemOptions.makeOptions(this, view)
             .addChecked(!ChatActivity.noForwardQuote, LocaleController.getString(R.string.ShowSendersName), () -> {
                 ChatActivity.noForwardQuote = false;
@@ -12155,8 +12188,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             .addChecked(ChatActivity.noForwardQuote, LocaleController.getString(R.string.HideSendersName), () -> {
                 ChatActivity.noForwardQuote = true;
             })
-            .add(R.drawable.input_notify_off, getString(R.string.SendWithoutSound), () -> {
-                this.notify = false;
+            .addIf(canSendDocs, R.drawable.msg_sendfile, LocaleController.getString(multipleMedia ? R.string.SendAsFiles : R.string.SendAsFile), () -> {
+                this.forceDocument = true;
                 if (delegate == null || selectedDialogs.isEmpty()) {
                     return;
                 }
@@ -12165,12 +12198,24 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     topicKeys.add(MessagesStorage.TopicKey.of(selectedDialogs.get(i), 0));
                 delegate.didSelectDialogs(DialogsActivity.this, topicKeys, commentView.getFieldText(), false, notify, scheduleDate, scheduleRepeatPeriod, null);
             })
-            .addIf(canSchedule, R.drawable.msg_calendar2, LocaleController.getString(R.string.ScheduleMessage), () -> {
+            .add(R.drawable.input_notify_off, getString(R.string.SendWithoutSound), () -> {
+                this.notify = false;
+                this.forceDocument = false;
+                if (delegate == null || selectedDialogs.isEmpty()) {
+                    return;
+                }
+                final ArrayList<MessagesStorage.TopicKey> topicKeys = new ArrayList<>();
+                for (int i = 0; i < selectedDialogs.size(); i++)
+                    topicKeys.add(MessagesStorage.TopicKey.of(selectedDialogs.get(i), 0));
+                delegate.didSelectDialogs(DialogsActivity.this, topicKeys, commentView.getFieldText(), false, notify, scheduleDate, scheduleRepeatPeriod, null);
+            })
+            .addIf(canSchedule, R.drawable.msg_calendar2, LocaleController.getString(onlyMyselfFinal ? R.string.SetReminder : R.string.ScheduleMessage), () -> {
                 AlertsCreator.createScheduleDatePickerDialog(getParentActivity(), onlyMyselfFinal ? getUserConfig().getClientUserId() : -1, new AlertsCreator.ScheduleDatePickerDelegate() {
                     @Override
                     public void didSelectDate(boolean notify, int scheduleDate, int scheduleRepeatPeriod) {
                         DialogsActivity.this.scheduleDate = scheduleDate;
                         DialogsActivity.this.scheduleRepeatPeriod = scheduleRepeatPeriod;
+                        DialogsActivity.this.forceDocument = false;
                         if (delegate == null || selectedDialogs.isEmpty()) {
                             return;
                         }
@@ -12963,7 +13008,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (StoryRecorder.isVisible() || (getLastStoryViewer() != null && getLastStoryViewer().isFullyVisible())) {
             animated = false;
         }
-        boolean onlySelfStories = !isArchive() && getStoriesController().hasOnlySelfStories();
+        // na: a community opened as a single chat has no stories row; own stories overlapped its action bar (A0048)
+        boolean onlySelfStories = !isArchive() && communityId == 0 && getStoriesController().hasOnlySelfStories();
         boolean newVisibility;
         if (communityId != 0) {
             newVisibility = false;
@@ -14262,6 +14308,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         updateContextViewPosition();
     }
 
+    private boolean isMainTabsShown() {
+        return hasMainTabs && NaConfig.INSTANCE.getMainTabsStyle().Int() != MainTabsStyle.DISABLE.getValue();
+    }
+
     private void checkUi_mainTabsVisible() {
         final boolean mainTabsVisible = !searching && (blurredView == null || blurredView.getBackground() == null || blurredView.getAlpha() < 0.01f || blurredView.getVisibility() == View.GONE);
         if (mainTabsActivityController != null) {
@@ -14436,7 +14486,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         iBlur3PositionActionBar.set(0, -additionalList, fragmentView.getMeasuredWidth(), lerp(actionBarHeight, actionBarHeightSearch, animatorSearchVisible.getFloatValue()) + additionalList );
 
         boolean hasBottomBlur = false;
-        if (hasMainTabs) {
+        if (isMainTabsShown()) {
             iBlur3PositionMainTabs.set(0, mainTabTop, fragmentView.getMeasuredWidth(), mainTabBottom);
             iBlur3PositionMainTabs.inset(0, LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48));
 

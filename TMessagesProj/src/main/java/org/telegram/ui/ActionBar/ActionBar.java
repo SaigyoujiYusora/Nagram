@@ -433,18 +433,32 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                     }
                 }
             }
-            if (NekoConfig.actionBarDecoration.Int() == 3) {
+            int decoration = NekoConfig.actionBarDecoration.Int();
+            if (decoration == 3) {
                 if (snowflakesEffect != null) {
                     snowflakesEffect = null;
                 }
                 if (fireworksEffect != null) {
                     fireworksEffect = null;
                 }
-            } else if (NekoConfig.actionBarDecoration.Int() == 2) {
+            } else if (decoration == 2) {
+                if (snowflakesEffect != null) {
+                    snowflakesEffect = null;
+                }
                 if (fireworksEffect == null) {
                     fireworksEffect = new FireworksEffect();
                 }
-            } else if (NekoConfig.actionBarDecoration.Int() == 1 || Theme.canStartHolidayAnimation()) {
+            } else if (decoration == 1) {
+                if (fireworksEffect != null) {
+                    fireworksEffect = null;
+                }
+                if (snowflakesEffect == null) {
+                    snowflakesEffect = new SnowflakesEffect(0);
+                }
+            } else if (Theme.canStartHolidayAnimation()) {
+                if (fireworksEffect != null) {
+                    fireworksEffect = null;
+                }
                 if (snowflakesEffect == null) {
                     snowflakesEffect = new SnowflakesEffect(0);
                 }
@@ -1463,7 +1477,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
 
         for (int i = 0; i < 2; i++) {
             if (titleTextView[0] != null && titleTextView[0].getVisibility() != GONE || subtitleTextView != null && subtitleTextView.getVisibility() != GONE) {
-                int availableWidth = width - (menu != null ? menu.getMeasuredWidth() : 0) - dp(16) - textLeft - titleRightMargin;
+                // A closing search field keeps filling the menu during its fade-out; don't squeeze the title for it.
+                int titleMenuWidth = menu != null ? menu.getMeasuredWidth() - (isSearchFieldVisible ? 0 : menu.getClosingSearchFieldWidth()) : 0;
+                int availableWidth = width - titleMenuWidth - dp(16) - textLeft - titleRightMargin;
                 availableWidth = Math.max(availableWidth, 0);
                 if (isCenterTitle) {
                     availableWidth = width - dp(120);
