@@ -247,7 +247,7 @@ public class PipVideoOverlay implements IPipSourceDelegate {
         }
 
         VideoPlayer videoPlayer = photoViewer.getVideoPlayer();
-        boolean forward = longClickStartPoint[0] >= getSuggestedWidth() * scaleFactor * 0.5f;
+        boolean forward = true;
 
         long current = getCurrentPosition();
         long total = getDuration();

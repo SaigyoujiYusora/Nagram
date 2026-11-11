@@ -21408,21 +21408,10 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             if (current == C.TIME_UNSET || total < 8 * 1000) {
                 return;
             }
-            float x = longPressX;
-            int width = getContainerViewWidth();
             if (total > 180 * 1000 && !NaConfig.INSTANCE.getForceVideoNewRewindMethod().Bool()) {
-                boolean forward;
-                if (x >= width / 3 * 2) {
-                    forward = true;
-                } else if (x < width / 3) {
-                    forward = false;
-                } else {
-                    return;
-                }
-                longVideoPlayerRewinder.startRewind(videoPlayer, forward, currentVideoSpeed);
+                longVideoPlayerRewinder.startRewind(videoPlayer, true, currentVideoSpeed);
             } else {
-                final boolean forward = x > width / 3;
-                videoPlayerRewinder.startRewind(videoPlayer, forward, longPressX, currentVideoSpeed, seekSpeedDrawable);
+                videoPlayerRewinder.startRewind(videoPlayer, true, longPressX, currentVideoSpeed, seekSpeedDrawable);
             }
         }
     }

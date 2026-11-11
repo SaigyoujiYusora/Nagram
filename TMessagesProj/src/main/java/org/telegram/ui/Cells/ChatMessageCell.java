@@ -12256,7 +12256,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             float touchRadius = (lastTouchX - photoImage.getCenterX()) * (lastTouchX - photoImage.getCenterX()) + (lastTouchY - photoImage.getCenterY()) * (lastTouchY - photoImage.getCenterY());
             float r1 = (photoImage.getImageWidth() / 2f) * (photoImage.getImageWidth() / 2f);
             if (touchRadius < r1 && (lastTouchX > photoImage.getCenterX() + photoImage.getImageWidth() / 4f || lastTouchX < photoImage.getCenterX() - photoImage.getImageWidth() / 4f)) {
-                boolean forward = lastTouchX > photoImage.getCenterX();
+                boolean forward = true;
                 if (videoPlayerRewinder == null) {
                     videoForwardDrawable = new VideoForwardDrawable(true);
                     videoPlayerRewinder = new OldVideoPlayerRewinder() {
